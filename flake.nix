@@ -1,5 +1,5 @@
 {
-  description = "A Nix flake";
+  description = "Composable builders for Pulumi providers, packages, and language SDKs";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
@@ -21,6 +21,8 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = import inputs.systems;
       imports = [ inputs.treefmt-nix.flakeModule ];
+
+      flake.lib = import ./lib { };
 
       perSystem =
         { pkgs, ... }:
