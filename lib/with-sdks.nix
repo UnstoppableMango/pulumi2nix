@@ -2,15 +2,14 @@
   lib,
   fetchFromGitHub,
   sdkBuilders,
+  langArgNames,
 }:
 {
   base,
   ...
 }@args:
 let
-  langArgNames = lib.filter (name: name != "pythonArgs" && lib.hasSuffix "Args" name) (
-    builtins.attrNames args
-  );
+  argNames = langArgNames args;
 
   # The base builder may fetch its own `src` internally without exposing it
   # via passthru, so a source fetch is needed here too for any <lang>Args
@@ -46,7 +45,7 @@ let
         }
         // args.${argName}
       );
-    }) langArgNames
+    }) argNames
   );
 in
 if extraSdks == { } then
