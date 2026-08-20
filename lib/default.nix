@@ -60,4 +60,12 @@
   mkGeneratedSdk =
     { pkgs }:
     pkgs.callPackage ./mk-generated-sdk.nix { };
+
+  # Extracts schema.json from a source-based, multi-language component
+  # provider (a folder with a PulumiPlugin.yaml) via `pulumi package
+  # get-schema`, rather than building a separate `cmd/pulumi-gen-<name>`
+  # tool the way mkPulumiSchema/mkTerraformBridgeSchema do.
+  mkComponentSchema =
+    { pkgs }:
+    pkgs.callPackage ./mk-component-schema.nix { };
 }
