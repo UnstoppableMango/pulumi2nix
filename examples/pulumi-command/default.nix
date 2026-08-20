@@ -24,6 +24,9 @@ mkPulumiPackage rec {
   goArgs = {
     vendorHash = "sha256-AHCeuby00woF/OQIwHjEp1Y92ANbewjQSk/nAc9qTgE=";
   };
+  dotnetArgs = {
+    nugetDeps = ./deps.json;
+  };
   meta = {
     description = "pulumi2nix example: pulumi-command via mkPulumiPackage + withSdks (nodejs SDK layering)";
     mainProgram = "pulumi-resource-command";
