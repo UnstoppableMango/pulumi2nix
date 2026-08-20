@@ -53,4 +53,11 @@
   pulumiLanguageDotnet =
     { pkgs }:
     pkgs.callPackage ./pulumi-language-dotnet.nix { };
+
+  # Generates a language SDK's source tree on demand from a schema.json,
+  # via `pulumi package gen-sdk`, for packages that don't ship one
+  # upstream (e.g. component providers).
+  mkGeneratedSdk =
+    { pkgs }:
+    pkgs.callPackage ./mk-generated-sdk.nix { };
 }
