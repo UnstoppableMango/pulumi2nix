@@ -26,7 +26,20 @@
 
       perSystem =
         { pkgs, ... }:
+        let
+          examples = import ./examples {
+            inherit pkgs;
+            nixpkgsPath = inputs.nixpkgs;
+            flakeLib = import ./lib { };
+          };
+        in
         {
+          packages = examples // {
+            default = pkgs.linkFarm "pulumi2nix-examples" examples;
+          };
+
+          checks = examples;
+
           devShells.default = pkgs.mkShellNoCC {
             packages = with pkgs; [
               gnumake
