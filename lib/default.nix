@@ -14,6 +14,12 @@
     { pkgs, nixpkgsPath }:
     pkgs.callPackage ./mk-terraform-bridge-provider.nix { inherit nixpkgsPath; };
 
+  # Builds only a provider's generated schema.json, without the resource
+  # provider binary or any SDKs.
+  mkPulumiSchema =
+    { pkgs }:
+    pkgs.callPackage ./mk-pulumi-schema.nix { };
+
   # Attaches `<lang>Args`-driven SDK builds to any base derivation's
   # `passthru.sdks`, not just a terraform-bridge one.
   withSdks =
