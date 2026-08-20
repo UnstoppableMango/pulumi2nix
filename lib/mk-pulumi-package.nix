@@ -4,7 +4,12 @@
   nixpkgsPath,
 }:
 let
-  mkTerraformBridgeProvider = callPackage ./mk-terraform-bridge-provider.nix { inherit nixpkgsPath; };
+  mkSchema = callPackage ./mk-schema.nix { };
+  mkTerraformBridgeSchema = callPackage ./mk-terraform-bridge-schema.nix { inherit mkSchema; };
+  mkPulumiSchema = callPackage ./mk-pulumi-schema.nix { inherit mkSchema; };
+  mkTerraformBridgeProvider = callPackage ./mk-terraform-bridge-provider.nix {
+    inherit nixpkgsPath mkTerraformBridgeSchema;
+  };
   sdkBuilders = callPackage ./sdks { };
   withSdks = callPackage ./with-sdks.nix { inherit sdkBuilders; };
 in
@@ -14,5 +19,13 @@ let
     builtins.attrNames args
   );
   base = mkTerraformBridgeProvider (removeAttrs args langArgNames);
+  withSdksResult = withSdks (args // { inherit base; });
 in
-withSdks (args // { inherit base; })
+withSdksResult
+// {
+  # mkPulumiPackage's native + SDK-layering use case gets the native gen-tool
+  # schema convention, overriding the terraform-bridge one `base` attached.
+  passthru = withSdksResult.passthru // {
+    schema = mkPulumiSchema args;
+  };
+}

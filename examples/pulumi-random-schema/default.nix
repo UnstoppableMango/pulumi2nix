@@ -1,5 +1,5 @@
-{ lib, mkPulumiSchema }:
-mkPulumiSchema rec {
+{ lib, mkTerraformBridgeSchema }:
+mkTerraformBridgeSchema rec {
   owner = "pulumi";
   repo = "pulumi-random";
   version = "4.14.0";
@@ -9,7 +9,7 @@ mkPulumiSchema rec {
   cmdGen = "pulumi-tfgen-random";
   extraLdflags = [ "-X github.com/pulumi/${repo}/provider/v4/pkg/version.Version=v${version}" ];
   meta = {
-    description = "pulumi2nix example: pulumi-random schema.json via mkPulumiSchema";
+    description = "pulumi2nix example: pulumi-random schema.json via mkTerraformBridgeSchema";
     homepage = "https://github.com/pulumi/pulumi-random";
     license = lib.licenses.asl20;
     maintainers = [ ];
