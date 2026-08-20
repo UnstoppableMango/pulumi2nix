@@ -27,18 +27,25 @@
       perSystem =
         { pkgs, ... }:
         let
+          flakeLib = import ./lib { };
           examples = import ./examples {
             inherit pkgs;
             nixpkgsPath = inputs.nixpkgs;
-            flakeLib = import ./lib { };
+            inherit flakeLib;
+          };
+          tools = {
+            pulumi-language-dotnet = flakeLib.pulumiLanguageDotnet { inherit pkgs; };
           };
         in
         {
-          packages = examples // {
-            default = pkgs.linkFarm "pulumi2nix-examples" examples;
-          };
+          packages =
+            examples
+            // tools
+            // {
+              default = pkgs.linkFarm "pulumi2nix-examples" examples;
+            };
 
-          checks = examples;
+          checks = examples // tools;
 
           devShells.default = pkgs.mkShellNoCC {
             packages = with pkgs; [
