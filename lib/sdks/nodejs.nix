@@ -2,12 +2,10 @@
   lib,
   buildNpmPackage,
 }:
-# Pulumi's nodejs codegen always emits an SDK that compiles to `bin/`
-# (tsconfig.json's outDir) and is published from `bin/` once package.json
-# (version-substituted) and the license/readme are copied alongside the
-# compiled output, not from the SDK source root. This mirrors that
-# convention; it's the same shape used by every provider's Node.js SDK, not
-# something specific to one provider.
+# Pulumi's nodejs codegen always emits an SDK that compiles to `bin/` and is
+# published from there once package.json and the license/readme are copied
+# alongside the compiled output. This mirrors that convention, the same
+# shape used by every provider's Node.js SDK.
 {
   meta ? { },
   pname,

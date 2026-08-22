@@ -1,11 +1,8 @@
-# Like with-sdks.nix, but for packages whose per-language SDK source isn't
-# fetched from an upstream repo - it's generated on demand from a
-# schema.json via mkGeneratedSdk (component providers, see
-# mk-component-package.nix). Each `<lang>Args` block carries a
-# `languagePlugin` (consumed here, by mkGeneratedSdk) alongside that
-# language's own sdkBuilders packaging args (e.g. `lockFile`/`npmDepsHash`
-# for nodejs) - stripped before forwarding the rest to `sdkBuilders.${lang}`,
-# same as with-sdks.nix does for its own per-language args.
+# Like with-sdks.nix, but for packages whose per-language SDK source is
+# generated on demand from a schema.json via mkGeneratedSdk (component
+# providers) instead of fetched from an upstream repo. Each `<lang>Args`
+# block carries a `languagePlugin` consumed here, stripped before forwarding
+# the rest to `sdkBuilders.${lang}`.
 {
   lib,
   sdkBuilders,

@@ -1,12 +1,8 @@
-# nixpkgs' `pulumiPackages` has `pulumi-language-{go,nodejs,python}` but no
-# `pulumi-language-dotnet` - .NET codegen lives in a separate upstream repo
-# (`pulumi/pulumi-dotnet`), not `pulumi/pulumi`. This fills that gap with a
-# pinned build of the language host binary, for use as a `pulumi package
-# gen-sdk --language dotnet` plugin alongside nixpkgs' other language hosts.
-#
-# `pulumi-language-dotnet/go.mod`'s pinned `pulumi/pulumi/{pkg,sdk}` version
-# should track the `pulumi` CLI version in use elsewhere in this flake (see
-# flake.lock) - the plugin and CLI speak the same RPC protocol version.
+# nixpkgs' pulumiPackages lacks pulumi-language-dotnet (.NET codegen lives in
+# the separate pulumi/pulumi-dotnet repo), so this pins a build of the
+# language host binary. Its pinned pulumi/pulumi/{pkg,sdk} version should
+# track the pulumi CLI version used elsewhere in this flake, since the
+# plugin and CLI speak the same RPC protocol.
 {
   buildGoModule,
   fetchFromGitHub,
@@ -22,10 +18,9 @@ buildGoModule {
     hash = "sha256-IGSP6aXU8mUfgPrLeIRnkR1OA3wDzqFv3/tdBloZ3Zg=";
   };
 
-  # The language host's module root is the binary package itself (flat
-  # layout: `pulumi-language-dotnet/main.go`), not a `cmd/<name>` subdir -
-  # see upstream's `.goreleaser.yml` (`dir: ./pulumi-language-dotnet`) and
-  # `Makefile`'s `build_language_host` target.
+  # The module root is the binary package itself (flat layout:
+  # pulumi-language-dotnet/main.go), not a cmd/<name> subdir. See upstream's
+  # .goreleaser.yml and Makefile's build_language_host target.
   modRoot = "pulumi-language-dotnet";
   subPackages = [ "." ];
 

@@ -6,14 +6,11 @@
   yarnBuildHook,
   yarnInstallHook,
 }:
-# Companion to nodejs.nix for hand-written, non-codegen'd nodejs Pulumi
-# packages (e.g. a plain component-resource library, not generated from a
-# schema) that use yarn classic instead of npm - nodejs.nix's `lockFile`
-# convention assumes a `package-lock.json`, which yarn-classic projects
-# don't have (and regenerating one from `yarn.lock` corrupts its
-# `resolved` URLs). This produces the same `$out/lib/node_modules/<pkgName>`
-# output shape as nodejs.nix, so callers (and `with-sdks.nix`) don't need
-# to care which one was used.
+# Companion to nodejs.nix for hand-written, non-codegen'd nodejs packages
+# that use yarn classic instead of npm, since regenerating a
+# package-lock.json from yarn.lock corrupts its resolved URLs. Produces the
+# same $out/lib/node_modules/<pkgName> output shape as nodejs.nix so callers
+# don't need to care which one was used.
 {
   meta ? { },
   pname,
