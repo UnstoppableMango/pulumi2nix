@@ -8,7 +8,7 @@ mkComponentPackage {
   pname = "test-component";
   version = "0.0.1";
   src = ./.;
-  schema = {
+  schemaArgs = {
     languagePlugin = pulumiPackages.pulumi-language-nodejs;
     lockFile = ./package-lock.json;
     npmDepsHash = "sha256-OJn3at3oJFm1SzJTipit5D+YwBkQpAfFPFK8G+7fMAQ=";

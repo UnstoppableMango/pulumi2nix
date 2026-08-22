@@ -2,16 +2,40 @@
 {
   # Wraps nixpkgs' own Go/Terraform-bridge Pulumi provider builder
   # (`pkgs/by-name/pu/pulumi/extra/mk-pulumi-package.nix`, found via
-  # `nixpkgsPath`) and layers `withSdks` on top to add composable
-  # per-language SDK builders (currently: nodejs) alongside the python SDK
-  # nixpkgs already provides.
+  # `nixpkgsPath`, which defaults to `pkgs.path`) and layers `withSdks` on
+  # top to add composable per-language SDK builders (currently: nodejs)
+  # alongside the python SDK nixpkgs already provides.
   mkPulumiPackage =
-    { pkgs, nixpkgsPath }:
-    pkgs.callPackage ./mk-pulumi-package.nix { inherit nixpkgsPath; };
+    {
+      pkgs,
+      nixpkgsPath ? pkgs.path,
+    }:
+    let
+      mkSchema = pkgs.callPackage ./mk-schema.nix { };
+      mkTerraformBridgeSchema = pkgs.callPackage ./mk-terraform-bridge-schema.nix { inherit mkSchema; };
+      mkPulumiSchema = pkgs.callPackage ./mk-pulumi-schema.nix { inherit mkSchema; };
+      mkTerraformBridgeProvider = pkgs.callPackage ./mk-terraform-bridge-provider.nix {
+        inherit nixpkgsPath mkTerraformBridgeSchema;
+      };
+      langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
+      sdkBuilders = pkgs.callPackage ./sdks { };
+      withSdks = pkgs.callPackage ./with-sdks.nix { inherit sdkBuilders langArgNames; };
+    in
+    pkgs.callPackage ./mk-pulumi-package.nix {
+      inherit
+        langArgNames
+        mkTerraformBridgeProvider
+        mkPulumiSchema
+        withSdks
+        ;
+    };
 
   # The terraform-bridge base builder on its own, without any SDK layering.
   mkTerraformBridgeProvider =
-    { pkgs, nixpkgsPath }:
+    {
+      pkgs,
+      nixpkgsPath ? pkgs.path,
+    }:
     pkgs.callPackage ./mk-terraform-bridge-provider.nix {
       inherit nixpkgsPath;
       mkTerraformBridgeSchema = pkgs.callPackage ./mk-terraform-bridge-schema.nix {
@@ -34,6 +58,14 @@
     pkgs.callPackage ./mk-pulumi-schema.nix {
       mkSchema = pkgs.callPackage ./mk-schema.nix { };
     };
+
+  # The generic base schema-extraction builder underlying both
+  # mkTerraformBridgeSchema and mkPulumiSchema, taking an explicit
+  # `schemaCommand` - the escape hatch for gen tools whose invocation
+  # doesn't fit either wrapper's convention.
+  mkSchema =
+    { pkgs }:
+    pkgs.callPackage ./mk-schema.nix { };
 
   # Attaches `<lang>Args`-driven SDK builds to any base derivation's
   # `passthru.sdks`, not just a terraform-bridge one.

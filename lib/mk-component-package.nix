@@ -5,12 +5,14 @@
 # Unlike mk-pulumi-package.nix, there's no compiled `pulumi-resource-<name>`
 # binary to build - the "build" step is just a validated copy of the
 # source into $out, with schema extraction as the actual heavyweight step
-# attached at passthru.schema. The `schema` arg is a nested attrset
+# attached at passthru.schema. The `schemaArgs` arg is a nested attrset
 # (`languagePlugin`, `lockFile`, `npmDepsHash`, ...) forwarded to
 # mkComponentSchema, kept separate from the top-level `<lang>Args` blocks
 # since schema extraction and SDK packaging need independent npm
 # dependency contexts (the component's own package.json vs. gen-sdk's
-# freshly generated one) despite using the same arg names.
+# freshly generated one) despite using the same arg names. Named
+# `schemaArgs` rather than `schema` to avoid colliding with the
+# `passthru.schema` derivation this builder produces.
 {
   stdenv,
   mkComponentSchema,
@@ -21,7 +23,7 @@
   version,
   src,
   meta,
-  schema,
+  schemaArgs,
   ...
 }@args:
 let
@@ -34,7 +36,7 @@ let
         src
         ;
     }
-    // schema
+    // schemaArgs
   );
 
   base = stdenv.mkDerivation {
@@ -61,7 +63,7 @@ let
   };
 in
 withGeneratedSdks (
-  (removeAttrs args [ "schema" ])
+  (removeAttrs args [ "schemaArgs" ])
   // {
     inherit base;
     schema = schemaDrv;

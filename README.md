@@ -42,7 +42,7 @@ Add this repo as a flake input, then obtain each builder via `callPackage` again
       let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         flakeLib = pulumi2nix.lib;
-        mkPulumiPackage = flakeLib.mkPulumiPackage { inherit pkgs; nixpkgsPath = nixpkgs; };
+        mkPulumiPackage = flakeLib.mkPulumiPackage { inherit pkgs; };
       in
       {
         my-provider = pkgs.callPackage ./my-provider { inherit mkPulumiPackage; };
@@ -51,8 +51,35 @@ Add this repo as a flake input, then obtain each builder via `callPackage` again
 }
 ```
 
-Each builder below is instantiated the same way: call the top-level function in `lib` with `pkgs` (and `nixpkgsPath` where the builder needs it) to get back a package-shaped function, then apply that to a provider's own arguments.
+Each builder below is instantiated the same way: call the top-level function in `lib` with `pkgs` to get back a package-shaped function, then apply that to a provider's own arguments.
+`mkPulumiPackage` and `mkTerraformBridgeProvider` also take an optional `nixpkgsPath`, used to locate nixpkgs' own Pulumi provider builder; it defaults to `pkgs.path`, so it only needs overriding when pinning a different nixpkgs revision than the one `pkgs` itself came from.
 The full, buildable source for every example is under [`examples/`](examples); what follows is the trimmed shape of each one.
+
+### Overlay
+
+As an alternative to threading `pkgs` through every builder call yourself, `pulumi2nix.overlays.default` applies every `lib` builder directly onto `pkgs`, pre-instantiated against it:
+
+```nix
+{
+  inputs.pulumi2nix.url = "github:UnstoppableMango/pulumi2nix";
+
+  outputs = { self, nixpkgs, pulumi2nix }: {
+    packages.x86_64-linux =
+      let
+        pkgs = import nixpkgs {
+          system = "x86_64-linux";
+          overlays = [ pulumi2nix.overlays.default ];
+        };
+      in
+      {
+        # pkgs.mkPulumiPackage, pkgs.mkComponentPackage, etc. are now
+        # available directly, with nixpkgsPath already defaulted to
+        # pkgs.path.
+        my-provider = pkgs.callPackage ./my-provider { };
+      };
+  };
+}
+```
 
 ### `mkPulumiSchema`
 
@@ -145,6 +172,25 @@ mkTerraformBridgeProvider rec {
 }
 ```
 
+### `mkSchema`
+
+The generic base builder underlying both `mkPulumiSchema` and `mkTerraformBridgeSchema` - takes an explicit `schemaCommand` invocation instead of assuming either wrapper's convention (tfgen's `schema` subcommand, or a native gen tool's `<out> --version <version>` flags). Use this directly when a provider's gen tool doesn't fit either convention.
+
+```nix
+{ lib, mkSchema }:
+mkSchema rec {
+  owner = "pulumi";
+  repo = "pulumi-command";
+  version = "0.9.0";
+  rev = "v${version}";
+  hash = "sha256-...";
+  vendorHash = "sha256-...";
+  cmdGen = "pulumi-gen-command";
+  schemaCommand = "${cmdGen} schema.json --version ${version}"; # whatever this gen tool's own convention is
+  meta.license = lib.licenses.asl20;
+}
+```
+
 ### `mkComponentSchema`
 
 Extracts `schema.json` from a source-based, multi-language component provider (a directory carrying `PulumiPlugin.yaml`) by shelling out to `pulumi package get-schema`, which runs the component's own source directly.
@@ -174,7 +220,7 @@ mkComponentPackage {
   pname = "test-component";
   version = "0.0.1";
   src = ./.;
-  schema = {
+  schemaArgs = {
     languagePlugin = pulumiPackages.pulumi-language-nodejs;
     lockFile = ./package-lock.json;
     npmDepsHash = "sha256-...";
