@@ -31,7 +31,6 @@
           flakeLib = import ./lib { };
           examples = import ./examples {
             inherit pkgs;
-            nixpkgsPath = inputs.nixpkgs;
             inherit flakeLib;
           };
           overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);

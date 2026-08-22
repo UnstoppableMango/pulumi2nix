@@ -1,14 +1,13 @@
 { }:
 {
-  # Wraps nixpkgs' own Go/Terraform-bridge Pulumi provider builder
-  # (`pkgs/by-name/pu/pulumi/extra/mk-pulumi-package.nix`, found via
-  # `nixpkgsPath`, which defaults to `pkgs.path`) and layers `withSdks` on
-  # top to add composable per-language SDK builders (currently: nodejs)
-  # alongside the python SDK nixpkgs already provides.
+  # Builds nixpkgs-style Go/Terraform-bridge Pulumi provider packages (logic
+  # ported from nixpkgs' own `pkgs/by-name/pu/pulumi/extra/mk-pulumi-
+  # package.nix` builder) and layers `withSdks` on top to add composable
+  # per-language SDK builders (currently: nodejs) alongside the python SDK
+  # this repo's port already provides.
   mkPulumiPackage =
     {
       pkgs,
-      nixpkgsPath ? pkgs.path,
     }:
     let
       mkSchema = pkgs.callPackage ./mk-schema.nix { };
@@ -19,7 +18,6 @@
       withSdks = pkgs.callPackage ./with-sdks.nix { inherit sdkBuilders langArgNames; };
       mkTerraformBridgeProvider = pkgs.callPackage ./mk-terraform-bridge-provider.nix {
         inherit
-          nixpkgsPath
           mkTerraformBridgeSchema
           langArgNames
           withSdks
@@ -38,10 +36,8 @@
   mkTerraformBridgeProvider =
     {
       pkgs,
-      nixpkgsPath ? pkgs.path,
     }:
     pkgs.callPackage ./mk-terraform-bridge-provider.nix {
-      inherit nixpkgsPath;
       mkTerraformBridgeSchema = pkgs.callPackage ./mk-terraform-bridge-schema.nix {
         mkSchema = pkgs.callPackage ./mk-schema.nix { };
       };
