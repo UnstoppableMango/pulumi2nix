@@ -46,4 +46,11 @@
   sdkBuilders =
     { pkgs }:
     pkgs.callPackage ./sdks { };
+
+  # nixpkgs has no `pulumi-language-dotnet` (unlike its `pulumi-language-
+  # {go,nodejs,python}`) - a pinned build of it, for use as a
+  # `pulumi package gen-sdk --language dotnet` plugin.
+  pulumiLanguageDotnet =
+    { pkgs }:
+    pkgs.callPackage ./pulumi-language-dotnet.nix { };
 }
