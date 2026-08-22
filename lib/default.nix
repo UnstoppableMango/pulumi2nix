@@ -39,7 +39,10 @@
   # `passthru.sdks`, not just a terraform-bridge one.
   withSdks =
     { pkgs }:
-    pkgs.callPackage ./with-sdks.nix { sdkBuilders = pkgs.callPackage ./sdks { }; };
+    pkgs.callPackage ./with-sdks.nix {
+      sdkBuilders = pkgs.callPackage ./sdks { };
+      langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
+    };
 
   # Registry of per-language SDK builders (lang name -> builder function),
   # for composing SDK builds directly without going through `withSdks`.
@@ -68,4 +71,29 @@
   mkComponentSchema =
     { pkgs }:
     pkgs.callPackage ./mk-component-schema.nix { };
+
+  # Like withSdks, but for packages whose SDK source is generated on
+  # demand from a schema.json (via mkGeneratedSdk) rather than fetched
+  # from an upstream repo.
+  withGeneratedSdks =
+    { pkgs }:
+    pkgs.callPackage ./with-generated-sdks.nix {
+      sdkBuilders = pkgs.callPackage ./sdks { };
+      mkGeneratedSdk = pkgs.callPackage ./mk-generated-sdk.nix { };
+      langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
+    };
+
+  # Builds a source-based, multi-language component provider package:
+  # mkComponentSchema for passthru.schema, layered with per-language SDK
+  # generation via withGeneratedSdks.
+  mkComponentPackage =
+    { pkgs }:
+    pkgs.callPackage ./mk-component-package.nix {
+      mkComponentSchema = pkgs.callPackage ./mk-component-schema.nix { };
+      withGeneratedSdks = pkgs.callPackage ./with-generated-sdks.nix {
+        sdkBuilders = pkgs.callPackage ./sdks { };
+        mkGeneratedSdk = pkgs.callPackage ./mk-generated-sdk.nix { };
+        langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
+      };
+    };
 }

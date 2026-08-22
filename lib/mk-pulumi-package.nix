@@ -1,5 +1,4 @@
 {
-  lib,
   callPackage,
   nixpkgsPath,
 }:
@@ -10,15 +9,14 @@ let
   mkTerraformBridgeProvider = callPackage ./mk-terraform-bridge-provider.nix {
     inherit nixpkgsPath mkTerraformBridgeSchema;
   };
+  langArgNames = callPackage ./lang-arg-names.nix { };
   sdkBuilders = callPackage ./sdks { };
-  withSdks = callPackage ./with-sdks.nix { inherit sdkBuilders; };
+  withSdks = callPackage ./with-sdks.nix { inherit sdkBuilders langArgNames; };
 in
 args@{ ... }:
 let
-  langArgNames = lib.filter (name: name != "pythonArgs" && lib.hasSuffix "Args" name) (
-    builtins.attrNames args
-  );
-  base = mkTerraformBridgeProvider (removeAttrs args langArgNames);
+  argNames = langArgNames args;
+  base = mkTerraformBridgeProvider (removeAttrs args argNames);
   withSdksResult = withSdks (args // { inherit base; });
 in
 withSdksResult
