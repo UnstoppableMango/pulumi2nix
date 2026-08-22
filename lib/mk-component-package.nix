@@ -1,18 +1,7 @@
-# Builds a source-based, multi-language component provider package (a
-# folder with a PulumiPlugin.yaml - see mk-component-schema.nix) and
-# layers per-language SDK generation on top via with-generated-sdks.nix.
-#
-# Unlike mk-pulumi-package.nix, there's no compiled `pulumi-resource-<name>`
-# binary to build - the "build" step is just a validated copy of the
-# source into $out, with schema extraction as the actual heavyweight step
-# attached at passthru.schema. The `schemaArgs` arg is a nested attrset
-# (`languagePlugin`, `lockFile`, `npmDepsHash`, ...) forwarded to
-# mkComponentSchema, kept separate from the top-level `<lang>Args` blocks
-# since schema extraction and SDK packaging need independent npm
-# dependency contexts (the component's own package.json vs. gen-sdk's
-# freshly generated one) despite using the same arg names. Named
-# `schemaArgs` rather than `schema` to avoid colliding with the
-# `passthru.schema` derivation this builder produces.
+# Builds a source-based, multi-language component provider package and layers
+# per-language SDK generation on top via with-generated-sdks.nix. The `schemaArgs`
+# arg is kept separate from the top-level `<lang>Args` blocks because schema
+# extraction and SDK packaging need independent npm dependency contexts.
 {
   stdenv,
   mkComponentSchema,

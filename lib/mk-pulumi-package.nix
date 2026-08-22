@@ -16,8 +16,7 @@ assert
     examples/pulumi-command/default.nix).
   '';
 (mkTerraformBridgeProvider args).overrideAttrs (old: {
-  # mkPulumiPackage's native + SDK-layering use case gets the native gen-tool
-  # schema convention, overriding the terraform-bridge one `mkTerraformBridgeProvider` attached.
+  # Overrides the terraform-bridge schema convention with the native gen-tool one.
   passthru = old.passthru // {
     schema = mkPulumiSchema args;
   };

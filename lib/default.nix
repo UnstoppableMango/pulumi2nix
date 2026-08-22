@@ -1,10 +1,7 @@
 { pkgs }:
 {
-  # Builds nixpkgs-style Go/Terraform-bridge Pulumi provider packages (logic
-  # ported from nixpkgs' own `pkgs/by-name/pu/pulumi/extra/mk-pulumi-
-  # package.nix` builder) and layers `withSdks` on top to add composable
-  # per-language SDK builders (currently: nodejs) alongside the python SDK
-  # this repo's port already provides.
+  # Builds nixpkgs-style Go/Terraform-bridge Pulumi provider packages, layered with
+  # composable per-language SDK builders via withSdks.
   mkPulumiPackage =
     let
       mkSchema = pkgs.callPackage ./mk-schema.nix { };
@@ -28,8 +25,7 @@
         ;
     };
 
-  # The terraform-bridge base builder, with `<lang>Args` SDK layering (same
-  # as mkPulumiPackage) but the tfgen schema-generation convention.
+  # The terraform-bridge base builder, using the tfgen schema-generation convention.
   mkTerraformBridgeProvider = pkgs.callPackage ./mk-terraform-bridge-provider.nix {
     mkTerraformBridgeSchema = pkgs.callPackage ./mk-terraform-bridge-schema.nix {
       mkSchema = pkgs.callPackage ./mk-schema.nix { };
@@ -53,51 +49,42 @@
     mkSchema = pkgs.callPackage ./mk-schema.nix { };
   };
 
-  # The generic base schema-extraction builder underlying both
-  # mkTerraformBridgeSchema and mkPulumiSchema, taking an explicit
-  # `schemaCommand` - the escape hatch for gen tools whose invocation
-  # doesn't fit either wrapper's convention.
+  # The generic base schema-extraction builder underlying both schema wrappers,
+  # taking an explicit `schemaCommand` as an escape hatch for gen tools that don't
+  # fit either convention.
   mkSchema = pkgs.callPackage ./mk-schema.nix { };
 
-  # Attaches `<lang>Args`-driven SDK builds to any base derivation's
-  # `passthru.sdks`, not just a terraform-bridge one.
+  # Attaches `<lang>Args`-driven SDK builds to any base derivation's `passthru.sdks`.
   withSdks = pkgs.callPackage ./with-sdks.nix {
     sdkBuilders = pkgs.callPackage ./sdks { };
     langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
   };
 
-  # Registry of per-language SDK builders (lang name -> builder function),
-  # for composing SDK builds directly without going through `withSdks`.
+  # Registry of per-language SDK builders (lang name -> builder function).
   sdkBuilders = pkgs.callPackage ./sdks { };
 
-  # nixpkgs has no `pulumi-language-dotnet` (unlike its `pulumi-language-
-  # {go,nodejs,python}`) - a pinned build of it, for use as a
-  # `pulumi package gen-sdk --language dotnet` plugin.
+  # nixpkgs has no `pulumi-language-dotnet` builder, so this is a pinned build
+  # for use as a `pulumi package gen-sdk --language dotnet` plugin.
   pulumiLanguageDotnet = pkgs.callPackage ./pulumi-language-dotnet.nix { };
 
-  # Generates a language SDK's source tree on demand from a schema.json,
-  # via `pulumi package gen-sdk`, for packages that don't ship one
-  # upstream (e.g. component providers).
+  # Generates a language SDK's source tree on demand from a schema.json, for
+  # packages that don't ship one upstream (e.g. component providers).
   mkGeneratedSdk = pkgs.callPackage ./mk-generated-sdk.nix { };
 
-  # Extracts schema.json from a source-based, multi-language component
-  # provider (a folder with a PulumiPlugin.yaml) via `pulumi package
-  # get-schema`, rather than building a separate `cmd/pulumi-gen-<name>`
-  # tool the way mkPulumiSchema/mkTerraformBridgeSchema do.
+  # Extracts schema.json from a source-based, multi-language component provider
+  # via `pulumi package get-schema`, rather than building a separate gen tool.
   mkComponentSchema = pkgs.callPackage ./mk-component-schema.nix { };
 
-  # Like withSdks, but for packages whose SDK source is generated on
-  # demand from a schema.json (via mkGeneratedSdk) rather than fetched
-  # from an upstream repo.
+  # Like withSdks, but for packages whose SDK source is generated on demand
+  # from a schema.json rather than fetched from an upstream repo.
   withGeneratedSdks = pkgs.callPackage ./with-generated-sdks.nix {
     sdkBuilders = pkgs.callPackage ./sdks { };
     mkGeneratedSdk = pkgs.callPackage ./mk-generated-sdk.nix { };
     langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
   };
 
-  # Builds a source-based, multi-language component provider package:
-  # mkComponentSchema for passthru.schema, layered with per-language SDK
-  # generation via withGeneratedSdks.
+  # Builds a source-based, multi-language component provider package, layered
+  # with per-language SDK generation via withGeneratedSdks.
   mkComponentPackage = pkgs.callPackage ./mk-component-package.nix {
     mkComponentSchema = pkgs.callPackage ./mk-component-schema.nix { };
     withGeneratedSdks = pkgs.callPackage ./with-generated-sdks.nix {

@@ -36,12 +36,9 @@
           overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);
           tools = {
             pulumi-language-dotnet = flakeLib.pulumiLanguageDotnet;
-            # Exercises flake.overlays.default itself, not just flake.lib's
-            # curried-builder path. Same build recipe/output as
-            # pulumi-language-dotnet above (the overlay only touches
-            # lib/default.nix's own attrs, not buildGoModule/fetchFromGitHub),
-            # so this proves the overlay wires a real, buildable derivation
-            # without paying for a second build.
+            # Exercises flake.overlays.default itself, not just flake.lib's curried-builder path.
+            # Same build recipe/output as pulumi-language-dotnet above, so this proves the
+            # overlay wires a real derivation without paying for a second build.
             overlay-pulumi-language-dotnet = overlaidPkgs.pulumiLanguageDotnet;
           };
         in

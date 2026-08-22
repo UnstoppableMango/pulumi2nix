@@ -7,10 +7,8 @@
   withSdks,
 }:
 let
-  # Ported from nixpkgs' own Go/Terraform-bridge Pulumi provider builder
-  # (pkgs/by-name/pu/pulumi/extra/mk-pulumi-package.nix), so this repo owns
-  # the build recipe outright instead of reaching into a nixpkgs checkout
-  # at eval time.
+  # Ported from nixpkgs' mk-pulumi-package.nix so this repo owns the build
+  # recipe instead of reaching into a nixpkgs checkout at eval time.
   mkBasePackage =
     {
       pname,
@@ -87,14 +85,9 @@ let
                  setup.py
             fi
 
-            # Pulumi Python SDKs use `pkg_resources` to find their current version at
-            # runtime. However, `pkg_resources` has been deprecated from `setuptools`
-            # since v82.0.0 (https://setuptools.pypa.io/en/stable/history.html#v82-0-0).
-            #
-            # Bypass this problem by:
-            # - removing the `pkg_resources` import and,
-            # - patching the plugin `version` string as a literal instead of requesting
-            #   it via `pkg_resources`.
+            # pkg_resources (used by Pulumi Python SDKs to find their version at
+            # runtime) was deprecated from setuptools in v82.0.0. Work around it by
+            # removing the import and patching the version in as a literal.
             find . -name "_utilities.py" -exec sed -i \
               -e 's/import pkg_resources//g' \
               -e 's/pkg_resources.require(root_package)\[0\].version/"${version}"/g' \
@@ -122,12 +115,9 @@ let
 in
 args@{ ... }:
 let
-  # Upstream nixpkgs' own mk-pulumi-package.nix (ported into mkBasePackage/
-  # mkPythonPackage above) has no defaults for rev/extraLdflags/env/meta/
-  # fetchSubmodules, so they're normalized here before forwarding - this is
-  # the one spot that must compute them, since everything downstream
-  # (withSdks, mkTerraformBridgeSchema) can carry its own default
-  # independently for standalone use.
+  # Upstream mk-pulumi-package.nix has no defaults for rev/extraLdflags/env/
+  # meta/fetchSubmodules, so normalize them here before forwarding.
+  # Downstream consumers can still default them independently for standalone use.
   args' = args // {
     rev = args.rev or "v${args.version}";
     extraLdflags = args.extraLdflags or [ ];

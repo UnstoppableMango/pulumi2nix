@@ -14,10 +14,9 @@ let
   rev = args.rev or "v${args.version}";
 
   # The base builder may fetch its own `src` internally without exposing it
-  # via passthru, so a source fetch is needed here too for any <lang>Args
-  # builder that needs it (e.g. to read sdk/nodejs). Same inputs as the base
-  # builder's fetch, so it dedupes at the store level rather than actually
-  # fetching twice.
+  # via passthru, so fetch it again here for any <lang>Args builder that
+  # needs it. Same inputs as the base builder's fetch, so it dedupes at the
+  # store level instead of fetching twice.
   src = fetchFromGitHub {
     name = "source-${args.repo}-${rev}";
     inherit (args)
