@@ -30,7 +30,7 @@ let
   mkSdk =
     lang: langArgs:
     (sdkBuilders.${lang}
-      or (throw "lib/with-sdks.nix: no SDK builder registered for language '${lang}'")
+      or (throw "lib/with-sdks.nix: no SDK builder registered for language '${lang}' (available: ${lib.concatStringsSep ", " (builtins.attrNames sdkBuilders)})")
     )
       langArgs;
 
@@ -51,9 +51,8 @@ in
 if extraSdks == { } then
   base
 else
-  base
-  // {
-    passthru = base.passthru // {
-      sdks = base.passthru.sdks // extraSdks;
+  base.overrideAttrs (old: {
+    passthru = old.passthru // {
+      sdks = old.passthru.sdks // extraSdks;
     };
-  }
+  })

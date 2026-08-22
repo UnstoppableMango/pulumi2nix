@@ -23,6 +23,7 @@
       imports = [ inputs.treefmt-nix.flakeModule ];
 
       flake.lib = import ./lib { };
+      flake.overlays.default = import ./lib/overlay.nix;
 
       perSystem =
         { pkgs, ... }:
@@ -33,8 +34,16 @@
             nixpkgsPath = inputs.nixpkgs;
             inherit flakeLib;
           };
+          overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);
           tools = {
             pulumi-language-dotnet = flakeLib.pulumiLanguageDotnet { inherit pkgs; };
+            # Exercises flake.overlays.default itself, not just flake.lib's
+            # curried-builder path. Same build recipe/output as
+            # pulumi-language-dotnet above (the overlay only touches
+            # lib/default.nix's own attrs, not buildGoModule/fetchFromGitHub),
+            # so this proves the overlay wires a real, buildable derivation
+            # without paying for a second build.
+            overlay-pulumi-language-dotnet = overlaidPkgs.pulumiLanguageDotnet;
           };
         in
         {
