@@ -11,7 +11,7 @@ mkTerraformBridgeProvider rec {
   extraLdflags = [ "-X github.com/pulumi/${repo}/provider/v4/pkg/version.Version=v${version}" ];
   __darwinAllowLocalNetworking = true;
   meta = {
-    description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider (no SDK layering)";
+    description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider";
     mainProgram = "pulumi-resource-random";
     homepage = "https://github.com/pulumi/pulumi-random";
     license = lib.licenses.asl20;

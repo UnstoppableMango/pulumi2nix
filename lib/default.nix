@@ -14,23 +14,22 @@
       mkSchema = pkgs.callPackage ./mk-schema.nix { };
       mkTerraformBridgeSchema = pkgs.callPackage ./mk-terraform-bridge-schema.nix { inherit mkSchema; };
       mkPulumiSchema = pkgs.callPackage ./mk-pulumi-schema.nix { inherit mkSchema; };
-      mkTerraformBridgeProvider = pkgs.callPackage ./mk-terraform-bridge-provider.nix {
-        inherit nixpkgsPath mkTerraformBridgeSchema;
-      };
       langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
       sdkBuilders = pkgs.callPackage ./sdks { };
       withSdks = pkgs.callPackage ./with-sdks.nix { inherit sdkBuilders langArgNames; };
+      mkTerraformBridgeProvider = pkgs.callPackage ./mk-terraform-bridge-provider.nix {
+        inherit nixpkgsPath mkTerraformBridgeSchema langArgNames withSdks;
+      };
     in
     pkgs.callPackage ./mk-pulumi-package.nix {
       inherit
-        langArgNames
         mkTerraformBridgeProvider
         mkPulumiSchema
-        withSdks
         ;
     };
 
-  # The terraform-bridge base builder on its own, without any SDK layering.
+  # The terraform-bridge base builder, with `<lang>Args` SDK layering (same
+  # as mkPulumiPackage) but the tfgen schema-generation convention.
   mkTerraformBridgeProvider =
     {
       pkgs,
@@ -40,6 +39,11 @@
       inherit nixpkgsPath;
       mkTerraformBridgeSchema = pkgs.callPackage ./mk-terraform-bridge-schema.nix {
         mkSchema = pkgs.callPackage ./mk-schema.nix { };
+      };
+      langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
+      withSdks = pkgs.callPackage ./with-sdks.nix {
+        sdkBuilders = pkgs.callPackage ./sdks { };
+        langArgNames = pkgs.callPackage ./lang-arg-names.nix { };
       };
     };
 
