@@ -13,6 +13,16 @@
 # repo) plus `npm_config_offline=true`, or it isn't hermetic. Requires a
 # TypeScript entry point (`index.ts` in root/src, or `main`/`exports` in
 # package.json pointing at one) - a plain `.js` `main` is not discovered.
+#
+# `npm install` also rewrites package-lock.json in place, so the copy
+# staged in postPatch needs to be writable - `cp` from a nix store path
+# preserves the source's read-only mode, hence the `chmod +w` below.
+#
+# A component that imports another provider's SDK (e.g. `@pulumi/github`)
+# makes `get-schema` try to download that provider's resource plugin from
+# get.pulumi.com, which the sandboxed build has no network access for.
+# `providerPlugins` lets a caller seed `$HOME/.pulumi/plugins` with
+# pre-fetched plugin derivations to avoid that.
 {
   lib,
   stdenv,
@@ -30,12 +40,22 @@
   version,
   meta,
   sourceRoot ? null,
+  # List of { name, version, plugin } - plugin is a derivation whose
+  # output directory holds an already-extracted pulumi-resource-<name>
+  # plugin binary, seeded into the plugin cache before get-schema runs.
+  providerPlugins ? [ ],
   ...
 }@args:
 let
   postPatch = ''
     cp ${lockFile} package-lock.json
+    chmod +w package-lock.json
   '';
+
+  seedProviderPlugins = lib.concatMapStringsSep "\n" (p: ''
+    mkdir -p "$HOME/.pulumi/plugins/resource-${p.name}-v${p.version}"
+    cp -r ${p.plugin}/. "$HOME/.pulumi/plugins/resource-${p.name}-v${p.version}/"
+  '') providerPlugins;
 in
 stdenv.mkDerivation (
   {
@@ -69,6 +89,7 @@ stdenv.mkDerivation (
 
       export HOME=$TMPDIR
       export npm_config_offline=true
+      ${seedProviderPlugins}
       pulumi package get-schema . > schema.json
 
       runHook postBuild
@@ -89,5 +110,6 @@ stdenv.mkDerivation (
     "npmDepsHash"
     "languagePlugin"
     "sourceRoot"
+    "providerPlugins"
   ])
 )
