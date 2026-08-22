@@ -10,7 +10,7 @@
 # and the "install" is a verified copy of the module source (go.mod,
 # go.sum, and the go/ package tree) into $out.
 {
-  meta,
+  meta ? { },
   pname,
   src,
   version,

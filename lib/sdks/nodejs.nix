@@ -9,7 +9,7 @@
 # convention; it's the same shape used by every provider's Node.js SDK, not
 # something specific to one provider.
 {
-  meta,
+  meta ? { },
   pname,
   src,
   version,

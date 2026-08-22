@@ -23,12 +23,22 @@ let
 in
 args@{ ... }:
 let
-  argNames = langArgNames args;
-  base = upstreamBase (removeAttrs args argNames);
-  withSdksResult = withSdks (args // { inherit base; });
+  # Upstream nixpkgs' own mk-pulumi-package.nix (found via nixpkgsPath) has
+  # no defaults for rev/extraLdflags/meta, so they're normalized here
+  # before forwarding - this is the one spot that must compute them, since
+  # everything downstream (withSdks, mkTerraformBridgeSchema) can carry its
+  # own default independently for standalone use.
+  args' = args // {
+    rev = args.rev or "v${args.version}";
+    extraLdflags = args.extraLdflags or [ ];
+    meta = args.meta or { };
+  };
+  argNames = langArgNames args';
+  base = upstreamBase (removeAttrs args' argNames);
+  withSdksResult = withSdks (args' // { inherit base; });
 in
 withSdksResult.overrideAttrs (old: {
   passthru = old.passthru // {
-    schema = mkTerraformBridgeSchema args;
+    schema = mkTerraformBridgeSchema args';
   };
 })
