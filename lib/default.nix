@@ -29,6 +29,11 @@ let
     # The terraform-bridge base builder, using the tfgen schema-generation convention.
     mkTerraformBridgeProvider = callPackage ./mk-terraform-bridge-provider.nix { };
 
+    # Builds the generic, dynamically-bridged `pulumi-resource-terraform-provider`
+    # binary, which bridges any Terraform provider at runtime rather than being
+    # generated ahead-of-time for one specific upstream provider.
+    mkDynamicBridgeProvider = callPackage ./mk-dynamic-bridge-provider.nix { };
+
     # Builds nixpkgs-style Go/Terraform-bridge Pulumi provider packages, layered with
     # composable per-language SDK builders via withSdks.
     mkPulumiPackage = callPackage ./mk-pulumi-package.nix { };

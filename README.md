@@ -17,6 +17,9 @@ pulumi2nix is a library of composable Nix builders that model the distinct stage
 - **Bridged providers, generated from Terraform.**
 `mkTerraformBridgeSchema` and `mkTerraformBridgeProvider` drive `tfgen`'s `schema` language to derive a schema from an upstream Terraform provider, then build the resulting `pulumi-tfgen-<name>` bridged plugin binary from it.
 
+- **Dynamically bridged providers.**
+`mkDynamicBridgeProvider` builds the generic `pulumi-resource-terraform-provider` binary from `pulumi/pulumi-terraform-bridge`'s `dynamic` package, which bridges *any* Terraform provider at runtime via parameterization (`pulumi package add terraform-provider ...`) instead of being generated ahead-of-time for one specific upstream provider.
+
 - **Providers generated from non-Terraform schema sources.**
 The same schema-then-package pattern extends to providers whose schema originates from OpenAPI or CloudFormation resource definitions, such as the `*-native` provider family, rather than from Terraform or a native Go generator.
 
@@ -168,6 +171,22 @@ mkTerraformBridgeProvider rec {
   extraLdflags = [ "-X github.com/pulumi/${repo}/provider/v4/pkg/version.Version=v${version}" ];
   nodejsArgs.lockFile = ./package-lock.json;
   nodejsArgs.npmDepsHash = "sha256-...";
+  meta.license = lib.licenses.asl20;
+}
+```
+
+### `mkDynamicBridgeProvider`
+
+Builds the generic `pulumi-resource-terraform-provider` binary, which dynamically bridges any Terraform provider at runtime rather than being generated ahead-of-time for one specific upstream provider like `mkTerraformBridgeProvider`.
+`owner`/`repo` default to `pulumi`/`pulumi-terraform-bridge` (where the `dynamic` package actually lives; `pulumi/pulumi-terraform-provider` only hosts releases built from it), so most callers only need to pin `version`/`hash`/`vendorHash`.
+See [`examples/pulumi-terraform-provider`](examples/pulumi-terraform-provider).
+
+```nix
+{ lib, mkDynamicBridgeProvider }:
+mkDynamicBridgeProvider {
+  version = "3.137.0";
+  hash = "sha256-...";
+  vendorHash = "sha256-...";
   meta.license = lib.licenses.asl20;
 }
 ```
