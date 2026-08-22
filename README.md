@@ -52,7 +52,6 @@ Add this repo as a flake input, then obtain each builder via `callPackage` again
 ```
 
 Each builder below is instantiated the same way: call the top-level function in `lib` with `pkgs` to get back a package-shaped function, then apply that to a provider's own arguments.
-`mkPulumiPackage` and `mkTerraformBridgeProvider` also take an optional `nixpkgsPath`, used to locate nixpkgs' own Pulumi provider builder; it defaults to `pkgs.path`, so it only needs overriding when pinning a different nixpkgs revision than the one `pkgs` itself came from.
 The full, buildable source for every example is under [`examples/`](examples); what follows is the trimmed shape of each one.
 
 ### Overlay
@@ -73,8 +72,7 @@ As an alternative to threading `pkgs` through every builder call yourself, `pulu
       in
       {
         # pkgs.mkPulumiPackage, pkgs.mkComponentPackage, etc. are now
-        # available directly, with nixpkgsPath already defaulted to
-        # pkgs.path.
+        # available directly.
         my-provider = pkgs.callPackage ./my-provider { };
       };
   };

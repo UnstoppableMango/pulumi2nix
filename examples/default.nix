@@ -1,11 +1,10 @@
 {
   pkgs,
-  nixpkgsPath,
   flakeLib,
 }:
 let
-  mkTerraformBridgeProvider = flakeLib.mkTerraformBridgeProvider { inherit pkgs nixpkgsPath; };
-  mkPulumiPackage = flakeLib.mkPulumiPackage { inherit pkgs nixpkgsPath; };
+  mkTerraformBridgeProvider = flakeLib.mkTerraformBridgeProvider { inherit pkgs; };
+  mkPulumiPackage = flakeLib.mkPulumiPackage { inherit pkgs; };
   mkTerraformBridgeSchema = flakeLib.mkTerraformBridgeSchema { inherit pkgs; };
   mkPulumiSchema = flakeLib.mkPulumiSchema { inherit pkgs; };
   mkComponentSchema = flakeLib.mkComponentSchema { inherit pkgs; };
