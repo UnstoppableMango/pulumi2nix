@@ -18,7 +18,12 @@
       sdkBuilders = pkgs.callPackage ./sdks { };
       withSdks = pkgs.callPackage ./with-sdks.nix { inherit sdkBuilders langArgNames; };
       mkTerraformBridgeProvider = pkgs.callPackage ./mk-terraform-bridge-provider.nix {
-        inherit nixpkgsPath mkTerraformBridgeSchema langArgNames withSdks;
+        inherit
+          nixpkgsPath
+          mkTerraformBridgeSchema
+          langArgNames
+          withSdks
+          ;
       };
     in
     pkgs.callPackage ./mk-pulumi-package.nix {
