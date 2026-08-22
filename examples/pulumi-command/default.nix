@@ -21,6 +21,9 @@ mkPulumiPackage rec {
     lockFile = ./package-lock.json;
     npmDepsHash = "sha256-U9Ez1fB0Mpau2n4Q+A4I+ZRSMnhGfAxJBqPtIMyEL8c=";
   };
+  goArgs = {
+    vendorHash = "sha256-AHCeuby00woF/OQIwHjEp1Y92ANbewjQSk/nAc9qTgE=";
+  };
   meta = {
     description = "pulumi2nix example: pulumi-command via mkPulumiPackage + withSdks (nodejs SDK layering)";
     mainProgram = "pulumi-resource-command";
