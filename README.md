@@ -41,8 +41,8 @@ Add this repo as a flake input, then obtain each builder via `callPackage` again
     packages.x86_64-linux =
       let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
-        flakeLib = pulumi2nix.lib;
-        mkPulumiPackage = flakeLib.mkPulumiPackage { inherit pkgs; };
+        flakeLib = pulumi2nix.lib { inherit pkgs; };
+        mkPulumiPackage = flakeLib.mkPulumiPackage;
       in
       {
         my-provider = pkgs.callPackage ./my-provider { inherit mkPulumiPackage; };
@@ -51,7 +51,7 @@ Add this repo as a flake input, then obtain each builder via `callPackage` again
 }
 ```
 
-Each builder below is instantiated the same way: call the top-level function in `lib` with `pkgs` to get back a package-shaped function, then apply that to a provider's own arguments.
+Each builder below is instantiated the same way: call `lib` once with `pkgs` to get back every builder pre-applied, then apply the one you need to a provider's own arguments.
 The full, buildable source for every example is under [`examples/`](examples); what follows is the trimmed shape of each one.
 
 ### Overlay
@@ -285,7 +285,7 @@ Feed its result as the `languagePlugin` for any `dotnetArgs` block above:
 ```nix
 { pkgs, flakeLib }:
 let
-  pulumiLanguageDotnet = flakeLib.pulumiLanguageDotnet { inherit pkgs; };
+  pulumiLanguageDotnet = flakeLib.pulumiLanguageDotnet;
 in
 # ... dotnetArgs.languagePlugin = pulumiLanguageDotnet;
 ```

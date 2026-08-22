@@ -3,12 +3,12 @@
   flakeLib,
 }:
 let
-  mkTerraformBridgeProvider = flakeLib.mkTerraformBridgeProvider { inherit pkgs; };
-  mkPulumiPackage = flakeLib.mkPulumiPackage { inherit pkgs; };
-  mkTerraformBridgeSchema = flakeLib.mkTerraformBridgeSchema { inherit pkgs; };
-  mkPulumiSchema = flakeLib.mkPulumiSchema { inherit pkgs; };
-  mkComponentSchema = flakeLib.mkComponentSchema { inherit pkgs; };
-  mkComponentPackage = flakeLib.mkComponentPackage { inherit pkgs; };
+  mkTerraformBridgeProvider = flakeLib.mkTerraformBridgeProvider;
+  mkPulumiPackage = flakeLib.mkPulumiPackage;
+  mkTerraformBridgeSchema = flakeLib.mkTerraformBridgeSchema;
+  mkPulumiSchema = flakeLib.mkPulumiSchema;
+  mkComponentSchema = flakeLib.mkComponentSchema;
+  mkComponentPackage = flakeLib.mkComponentPackage;
 in
 {
   pulumi-random = pkgs.callPackage ./pulumi-random { inherit mkTerraformBridgeProvider; };
@@ -18,6 +18,6 @@ in
   test-component-schema = pkgs.callPackage ./test-component-schema { inherit mkComponentSchema; };
   test-component = pkgs.callPackage ./test-component {
     inherit mkComponentPackage;
-    pulumiLanguageDotnet = flakeLib.pulumiLanguageDotnet { inherit pkgs; };
+    pulumiLanguageDotnet = flakeLib.pulumiLanguageDotnet;
   };
 }

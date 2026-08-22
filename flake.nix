@@ -22,20 +22,20 @@
       systems = import inputs.systems;
       imports = [ inputs.treefmt-nix.flakeModule ];
 
-      flake.lib = import ./lib { };
+      flake.lib = import ./lib;
       flake.overlays.default = import ./lib/overlay.nix;
 
       perSystem =
         { pkgs, ... }:
         let
-          flakeLib = import ./lib { };
+          flakeLib = import ./lib { inherit pkgs; };
           examples = import ./examples {
             inherit pkgs;
             inherit flakeLib;
           };
           overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);
           tools = {
-            pulumi-language-dotnet = flakeLib.pulumiLanguageDotnet { inherit pkgs; };
+            pulumi-language-dotnet = flakeLib.pulumiLanguageDotnet;
             # Exercises flake.overlays.default itself, not just flake.lib's
             # curried-builder path. Same build recipe/output as
             # pulumi-language-dotnet above (the overlay only touches
