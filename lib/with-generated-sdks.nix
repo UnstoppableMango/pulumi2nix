@@ -20,12 +20,14 @@
   meta ? { },
   ...
 }@args:
-assert !(args ? pythonArgs) || throw ''
-  withGeneratedSdks: `pythonArgs` isn't supported for source-based component
-  providers. Unlike mkPulumiPackage/mkTerraformBridgeProvider, there's no
-  upstream mkPythonPackage to delegate to here - only the languages
-  registered in lib/sdks (nodejs, yarnNodejs, go, dotnet) are available.
-'';
+assert
+  !(args ? pythonArgs)
+  || throw ''
+    withGeneratedSdks: `pythonArgs` isn't supported for source-based component
+    providers. Unlike mkPulumiPackage/mkTerraformBridgeProvider, there's no
+    upstream mkPythonPackage to delegate to here - only the languages
+    registered in lib/sdks (nodejs, yarnNodejs, go, dotnet) are available.
+  '';
 let
   argNames = langArgNames args;
 
