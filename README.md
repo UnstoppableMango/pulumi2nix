@@ -153,7 +153,7 @@ mkTerraformBridgeSchema rec {
 
 ### `mkTerraformBridgeProvider`
 
-Builds the full `pulumi-tfgen-<name>` bridged provider plugin binary from an upstream Terraform provider.
+Builds the full `pulumi-tfgen-<name>` bridged provider plugin binary from an upstream Terraform provider, and layers per-language SDKs (checked into the upstream repo's `sdk/<lang>`) on top via `<lang>Args` blocks, same as `mkPulumiPackage`.
 See [`examples/pulumi-random`](examples/pulumi-random).
 
 ```nix
@@ -168,6 +168,8 @@ mkTerraformBridgeProvider rec {
   cmdGen = "pulumi-tfgen-random";
   cmdRes = "pulumi-resource-random";
   extraLdflags = [ "-X github.com/pulumi/${repo}/provider/v4/pkg/version.Version=v${version}" ];
+  nodejsArgs.lockFile = ./package-lock.json;
+  nodejsArgs.npmDepsHash = "sha256-...";
   meta.license = lib.licenses.asl20;
 }
 ```

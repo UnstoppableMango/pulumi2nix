@@ -2,10 +2,12 @@
   callPackage,
   nixpkgsPath,
   mkTerraformBridgeSchema,
+  langArgNames,
+  withSdks,
 }:
 let
   mkPulumiPackagePath = "${nixpkgsPath}/pkgs/by-name/pu/pulumi/extra/mk-pulumi-package.nix";
-  base =
+  upstreamBase =
     if builtins.pathExists mkPulumiPackagePath then
       callPackage mkPulumiPackagePath { }
     else
@@ -19,8 +21,13 @@ let
         nixpkgs revision where this file still exists at that location.
       '';
 in
-args:
-(base args).overrideAttrs (old: {
+args@{ ... }:
+let
+  argNames = langArgNames args;
+  base = upstreamBase (removeAttrs args argNames);
+  withSdksResult = withSdks (args // { inherit base; });
+in
+withSdksResult.overrideAttrs (old: {
   passthru = old.passthru // {
     schema = mkTerraformBridgeSchema args;
   };
