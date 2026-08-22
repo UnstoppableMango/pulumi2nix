@@ -22,7 +22,7 @@
   pname,
   version,
   src,
-  meta,
+  meta ? { },
   schemaArgs,
   ...
 }@args:

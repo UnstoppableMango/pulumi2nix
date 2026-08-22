@@ -15,7 +15,7 @@
 # output shape as nodejs.nix, so callers (and `with-sdks.nix`) don't need
 # to care which one was used.
 {
-  meta,
+  meta ? { },
   pname,
   src,
   version,

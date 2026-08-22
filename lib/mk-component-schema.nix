@@ -38,7 +38,7 @@
   npmDepsHash,
   pname,
   version,
-  meta,
+  meta ? { },
   sourceRoot ? null,
   # List of { name, version, plugin } - plugin is a derivation whose
   # output directory holds an already-extracted pulumi-resource-<name>

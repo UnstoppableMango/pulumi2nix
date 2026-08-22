@@ -33,7 +33,7 @@
   languagePlugin,
   pname,
   version,
-  meta,
+  meta ? { },
   ...
 }:
 stdenv.mkDerivation {

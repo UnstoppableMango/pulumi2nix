@@ -2,7 +2,7 @@
   buildDotnetModule,
 }:
 {
-  meta,
+  meta ? { },
   pname,
   src,
   version,

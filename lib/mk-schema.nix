@@ -11,7 +11,7 @@
 {
   owner,
   repo,
-  rev,
+  rev ? "v${version}",
   version,
   hash,
   vendorHash,
@@ -20,7 +20,7 @@
   extraLdflags ? [ ],
   env ? { },
   fetchSubmodules ? false,
-  meta,
+  meta ? { },
   ...
 }:
 let
