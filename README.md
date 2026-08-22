@@ -205,9 +205,31 @@ mkComponentSchema {
   languagePlugin = pulumiPackages.pulumi-language-nodejs;
   lockFile = ./package-lock.json;
   npmDepsHash = "sha256-...";
+  # Optional: seed the plugin cache for components that import another
+  # provider's SDK (e.g. @pulumi/github), since get-schema otherwise
+  # tries to download that provider's resource plugin with no network
+  # access in the sandbox.
+  providerPlugins = [
+    {
+      name = "github";
+      version = "6.15.0";
+      plugin = pkgs.fetchurl { /* pulumi-resource-github tarball, extracted */ };
+    }
+  ];
   meta.license = lib.licenses.asl20;
 }
 ```
+
+**Component class shape.**
+`pulumi package get-schema`'s analyzer only recognizes classes that extend `ComponentResource` directly - it walks one heritage-clause level and checks the resolved symbol against `resource.ts`/`resource.d.ts`.
+A component extending an intermediate abstract base class (`Fork extends Repo extends ComponentResource`) is invisible to it, and fails with a generic "Failed to find the following components" error that gives no hint the cause is inheritance depth.
+Keep component classes extending `ComponentResource` directly; push shared logic into a plain helper function instead of a shared base class.
+
+The same analyzer also can't resolve utility or indexed-access types (`Omit<X, "y">`, `X["y"]`) in a component's args interface - it throws `Unsupported type for component ... property ...`.
+Write args interfaces as plain, explicit fields instead.
+
+**Untracked files.**
+`src = ./.` in a flake only sees git-tracked files, so a newly added `PulumiPlugin.yaml` or lockfile needs `git add`ing before the build can see it - otherwise `mkComponentPackage`'s "expected PulumiPlugin.yaml" check fails misleadingly.
 
 ### `mkComponentPackage`
 
