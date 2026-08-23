@@ -18,4 +18,4 @@ Unlike the Go module-file gap, this isn't a missing-input problem: the fix is to
 ## Generated SDKs aren't covered by CI
 
 `flake.nix` exposes only the base derivations through `packages`/`checks`, so `nix flake check` never builds `passthru.sdks.*`.
-Every per-language SDK build is verified by hand (`nix build .#test-component.sdks.go`), which is how the dotnet gap above went unnoticed.
+Every per-language SDK build is verified by hand (`nix build .#test-component.sdks.go`), which is how gaps like the dotnet one above escape notice.

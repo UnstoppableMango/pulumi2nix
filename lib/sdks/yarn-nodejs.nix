@@ -11,7 +11,7 @@
 # that use yarn classic instead of npm, since regenerating a
 # package-lock.json from yarn.lock corrupts its resolved URLs. Produces the
 # same $out/lib/node_modules/<pkgName> output shape as nodejs.nix so callers
-# don't need to care which one was used.
+# don't need to care which one is used.
 {
   meta ? { },
   pname,

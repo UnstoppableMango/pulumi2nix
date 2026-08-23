@@ -30,7 +30,7 @@ buildDotnetModule (
       echo -n "${version}" > version.txt
     '';
 
-    # This SDK is a pure library whose .csproj already sets
+    # This SDK is a pure library whose .csproj sets
     # GeneratePackageOnBuild, so pack it as a .nupkg instead of publishing a
     # meaningless binary output.
     dontPublish = true;

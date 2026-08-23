@@ -87,7 +87,7 @@ let
             fi
 
             # pkg_resources (used by Pulumi Python SDKs to find their version at
-            # runtime) was deprecated from setuptools in v82.0.0. Work around it by
+            # runtime) is deprecated in setuptools v82.0.0 and later. Work around it by
             # removing the import and patching the version in as a literal.
             find . -name "_utilities.py" -exec sed -i \
               -e 's/import pkg_resources//g' \
@@ -118,7 +118,7 @@ args@{ ... }:
 let
   # Upstream mk-pulumi-package.nix has no defaults for rev/extraLdflags/env/
   # meta/fetchSubmodules, so normalize them here before forwarding.
-  # Downstream consumers can still default them independently for standalone use.
+  # Downstream consumers can default them independently for standalone use.
   #
   # `src` is resolved here rather than at each use so the gen tool, the resource
   # binary, the python SDK, withSdks and mkTerraformBridgeSchema all share one

@@ -30,7 +30,7 @@ The same schema-then-package pattern extends to providers whose schema originate
 Every builder above separates schema extraction from binary packaging, so `schema.json` can be produced and consumed (for SDK generation, validation, or publishing) without paying for a full provider build.
 
 - **Language SDK generation.**
-`mkGeneratedSdk` runs `pulumi package gen-sdk` against a `schema.json` output using the target language's `pulumi-language-<lang>` plugin, covering Node.js, Python, and Go from nixpkgs' `pulumiPackages`, and .NET via this repo's own pinned `pulumi-language-dotnet` build (upstream `pulumi/pulumi-dotnet` has no packaged language host in nixpkgs). Java support is not yet implemented.
+`mkGeneratedSdk` runs `pulumi package gen-sdk` against a `schema.json` output using the target language's `pulumi-language-<lang>` plugin, covering Node.js, Python, and Go from nixpkgs' `pulumiPackages`, and .NET via this repo's own pinned `pulumi-language-dotnet` build (upstream `pulumi/pulumi-dotnet` has no packaged language host in nixpkgs). Java is not supported.
 Go additionally goes through `mkGeneratedGoSdk`, which attaches the `go.mod`/`go.sum` pair that `gen-sdk` never emits.
 
 ## Usage
@@ -76,7 +76,7 @@ mkTerraformBridgeProvider {
 ```
 
 `owner` and `hash` are only forced by the default fetch, so a caller supplying `src` can omit them.
-`repo` is still required either way, and `rev` still defaults to `v${version}`: both name the derivation, and `mkDynamicBridgeProvider` compiles `rev` into its version ldflag.
+`repo` is required either way, and `rev` defaults to `v${version}`: both name the derivation, and `mkDynamicBridgeProvider` compiles `rev` into its version ldflag.
 
 `sourceRoot` is resolved from the `src`'s name, so any fetcher output, a `lib.cleanSourceWith`, a plain path, and a store path all work.
 Note the caveat below about `src = ./.` inside a flake only seeing git-tracked files.
@@ -272,7 +272,7 @@ The same analyzer also can't resolve utility or indexed-access types (`Omit<X, "
 Write args interfaces as plain, explicit fields instead.
 
 **Untracked files.**
-`src = ./.` in a flake only sees git-tracked files, so a newly added `PulumiPlugin.yaml` or lockfile needs `git add`ing before the build can see it - otherwise `mkComponentPackage`'s "expected PulumiPlugin.yaml" check fails misleadingly.
+`src = ./.` in a flake only sees git-tracked files, so an untracked `PulumiPlugin.yaml` or lockfile needs `git add`ing before the build can see it - otherwise `mkComponentPackage`'s "expected PulumiPlugin.yaml" check fails misleadingly.
 
 **Go module files.**
 `pulumi package gen-sdk --language go` emits only `.go` sources: no `go.mod`, no `go.sum`.
