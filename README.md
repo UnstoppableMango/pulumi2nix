@@ -174,8 +174,22 @@ Paths that a given repo does not have are skipped rather than failing, and if th
 
 The provider and schema builds keep the whole tree: `postConfigure` runs the gen tool from the repo root, and tfgen reads the upstream provider's docs.
 
-Narrowing needs a tree that can be read while the expression evaluates: a path, or a realized store path such as a flake input or `inputs.self`.
+Narrowing needs a tree that can be read while the expression evaluates: a path, or any value that stringifies to a store path already realized on disk.
 A `src` that is still an unbuilt derivation - the default `fetchFromGitHub` fetch - is passed through untouched, which costs nothing: that output only moves when `rev` does.
+
+To narrow a provider's own repo, give the derivation an explicit `src` naming the subset the builds read:
+
+```nix
+pulumi.terraformBridgeProviders.pulumi-resource-git = {
+  src = lib.fileset.toSource {
+    root = ./.;
+    fileset = lib.fileset.unions [ ./provider ./sdk ];
+  };
+  # ...
+};
+```
+
+`lib.fileset.toSource` is the recommended shape because it names its own result, which is what `sourceRoot` is resolved from, and because it puts the tree the provider and schema builds see under your control rather than leaving it to whatever the surrounding expression happens to hand in.
 
 Two per-SDK escape hatches, for a repo whose SDK build reads something outside its own directory:
 

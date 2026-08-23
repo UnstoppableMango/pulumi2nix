@@ -5,9 +5,9 @@
 # in the repo are inputs to all four SDK derivations, and editing any of them
 # rebuilds every one of them.
 #
-# Only a tree readable at eval time can be narrowed: a path, or a realized store
-# path such as a flake input or `inputs.self`. A `src` that is still an unbuilt
-# derivation - the default `fetchFromGitHub` fetch - is returned unchanged:
+# Only a tree readable at eval time can be narrowed: a path, or any value that
+# stringifies to a store path already realized on disk. A `src` that is still an
+# unbuilt derivation - the default `fetchFromGitHub` fetch - is returned unchanged:
 # `lib.fileset` cannot look inside one without building it first, and narrowing
 # would buy nothing there anyway, since a fetch's output only moves when `rev`
 # does. That makes this a no-op for the common `owner`/`repo`/`rev`/`hash` path
@@ -75,11 +75,20 @@ in
       root =
         if builtins.isPath src then
           src
-        # lib.fileset rejects string-like values outright, but a flake input,
-        # `inputs.self` and a plain store-path string all name a directory that
-        # already exists, so recover the path they name instead of giving up.
+        # lib.fileset rejects string-like values outright, but any string-like
+        # value naming a directory that already exists still points at a tree
+        # readable right now, so recover the path it names instead of giving up.
+        #
+        # The context has to go, or Nix refuses the append outright: "a string
+        # that refers to a store path cannot be appended to a path". Discarding
+        # it is safe because `root` never reaches a derivation - it is only read
+        # during evaluation, by the `builtins.pathExists` calls below and by
+        # `lib.fileset.maybeMissing`. What a builder actually receives is either
+        # the untouched `src`, when narrowing bails out, or the output of
+        # `lib.fileset.toSource`, which re-adds the selected files under context
+        # of its own.
         else if !lib.isDerivation src && lib.isStringLike src then
-          /. + "${src}"
+          /. + (builtins.unsafeDiscardStringContext "${src}")
         else
           null;
 

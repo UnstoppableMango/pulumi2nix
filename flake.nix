@@ -58,6 +58,14 @@
           };
 
           checks = tools // {
+            # A unit check rather than another example: narrowing is pure `lib`
+            # work on a `src`, and no example can reach it because they all take
+            # the default fetch's pass-through branch.
+            narrow-sdk-src = import ./checks/narrow-sdk-src.nix {
+              inherit lib pkgs;
+              inherit (config.pulumi.lib) narrowSdkSrc;
+            };
+
             # Filtered to .nix files so an unrelated README edit doesn't rebuild it.
             nix-lint =
               let
