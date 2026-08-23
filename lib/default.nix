@@ -28,6 +28,10 @@ let
     # falls back to when the caller supplies no `src`.
     fetchProviderSource = callPackage ./fetch-provider-source.nix { };
 
+    # Cuts a shared provider `src` down to just the subtree one language's SDK
+    # builds from, so an unrelated file change stops rebuilding every SDK.
+    narrowSdkSrc = callPackage ./narrow-sdk-src.nix { };
+
     # Registry of per-language SDK builders (lang name -> builder function).
     # Given the augmented callPackage so the builders can reach `srcName`.
     sdkBuilders = callPackage ./sdks { inherit callPackage; };

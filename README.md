@@ -156,6 +156,43 @@ Set `pname` on the individual `sdks.<lang>` block (or `<lang>Args`) to override 
 `sourceRoot` is resolved from the `src`'s name, so any fetcher output, a `lib.cleanSourceWith`, a plain path, and a store path all work.
 Note the caveat below about `src = ./.` inside a flake only seeing git-tracked files.
 
+### Narrowed SDK sources
+
+The provider, the schema and every checked-in SDK share one `src`, but each SDK only ever builds from its own subtree.
+Each one is therefore handed a `lib.fileset`-narrowed copy of that tree rather than the whole thing, so editing a file no SDK reads (a README, a CI workflow, the Makefile) no longer changes those SDKs' input hashes and no longer rebuilds them.
+
+| SDK | Paths kept |
+| --- | --- |
+| `sdks.go` | `sdk/go`, `sdk/go.mod`, `sdk/go.sum` |
+| `sdks.nodejs`, `sdks.yarnNodejs` | `sdk/nodejs`, `README.md`, `LICENSE` |
+| `sdks.dotnet` | `sdk/dotnet` |
+| `sdks.python` | `sdk/python` |
+
+`README.md` and `LICENSE` are in the nodejs list because the SDK build copies them next to its compiled output.
+Paths that a given repo does not have are skipped rather than failing, and if the SDK's own directory is missing the whole tree is kept, on the assumption that the layout is not the one above.
+
+The provider and schema builds keep the whole tree: `postConfigure` runs the gen tool from the repo root, and tfgen reads the upstream provider's docs.
+
+Narrowing needs a tree that can be read while the expression evaluates: a path, or a realized store path such as a flake input or `inputs.self`.
+A `src` that is still an unbuilt derivation - the default `fetchFromGitHub` fetch - is passed through untouched, which costs nothing: that output only moves when `rev` does.
+
+Two per-SDK escape hatches, for a repo whose SDK build reads something outside its own directory:
+
+```nix
+sdks.nodejs = {
+  lockFile = ./package-lock.json;
+  npmDepsHash = "sha256-...";
+
+  # Keep the whole tree for this SDK.
+  narrowSrc = false;
+
+  # ...or replace the default path list. Missing paths are skipped.
+  srcPaths = [ "sdk/nodejs" "README.md" "LICENSE" "scripts/postinstall.js" ];
+};
+```
+
+Both are also accepted by the builders directly as `nodejsArgs.narrowSrc`, `goArgs.srcPaths`, and so on.
+
 ### Overlay
 
 As an alternative to threading `pkgs` through every builder call yourself, `pulumi2nix.overlays.default` applies every `lib` builder directly onto `pkgs`, pre-instantiated against it:
