@@ -1,4 +1,5 @@
 {
+  lib,
   buildGoModule,
   fetchProviderSource,
   python3Packages,
@@ -225,11 +226,14 @@ let
             # prefix kept this one apart before.
             pname = "${base'.repo}-sdk-python";
 
-            # The distribution name keeps its old value, so `pip show` and
-            # `pythonImportsCheck` behave exactly as before. A caller overriding
-            # `sdks.python.pname` (the documented workaround for a distribution
-            # that isn't named after the repo) still steers both.
-            distName = pythonArgs.pname or base'.repo;
+            # tfgen names the python distribution after the *Pulumi package*, not
+            # the repo: `pulumi-resource-git` ships `sdk/python` as `pulumi_git`,
+            # whatever the repo is called. Deriving this from `repo` only happens
+            # to work for repos named `pulumi-<name>`, and gets both the
+            # `pip show` check and the derived `pythonImportsCheck` wrong for
+            # everything else. `sdks.python.pname` stays the escape hatch, since
+            # `pythonArgs` is merged last and steers both names.
+            distName = pythonArgs.pname or ("pulumi-" + lib.removePrefix "pulumi-resource-" base'.cmdRes);
           }
           // pythonArgs
         );
