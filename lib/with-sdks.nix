@@ -13,7 +13,7 @@ let
 
   rev = args.rev or "v${args.version}";
 
-  # Callers that already resolved a `src` (mkTerraformBridgeProvider does)
+  # Callers that resolve a `src` themselves (mkTerraformBridgeProvider does)
   # pass it through so the <lang>Args builders share it. Standalone callers
   # wrapping a base derivation built elsewhere get a fallback fetch instead;
   # its inputs match the usual base-builder fetch, so it dedupes at the store

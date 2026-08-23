@@ -16,7 +16,7 @@
 }:
 # `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build from
 # a local checkout or a different fetcher. `hash` is only forced by that default,
-# so a caller supplying `src` can omit it. `rev` still names the source and feeds
+# so a caller supplying `src` can omit it. `rev` names the source and feeds
 # the version ldflag either way.
 {
   owner ? "pulumi",

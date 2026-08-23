@@ -13,7 +13,7 @@
 # `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build
 # from a local checkout or a different fetcher. `owner`/`hash` are only forced
 # by that default, so a caller supplying `src` can omit them. `repo`/`rev` are
-# still used for naming either way.
+# used for naming either way.
 {
   owner ? throw "mk-schema.nix: `owner` is required unless `src` is supplied",
   repo,
