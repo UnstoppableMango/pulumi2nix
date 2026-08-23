@@ -61,7 +61,31 @@ let
       schemaArgs = cleanArgs base.schemaArgs;
     }
     // lib.optionalAttrs (base ? sdkDrift) {
-      sdkDrift = stripNull (stripModule base.sdkDrift);
+      sdkDrift = cleanSdkDrift base.sdkDrift;
+    };
+
+  # `sdkDrift.languages` is either a plain list of names or an attrset of
+  # per-language submodules, so the nested cleanup only applies to the second
+  # shape. Each language config gets the same treatment as the enclosing block,
+  # for the same two reasons.
+  #
+  # Dropping nulls is the load-bearing half: the builder merges these attrs
+  # *last*, so that a language's own `exclude` beats the shared one, which means
+  # an unset `languagePlugin = null` would land on top of anything the shared
+  # block said rather than falling through to it.
+  #
+  # `stripModule` is defensive, as it is above: current nixpkgs' `submoduleWith`
+  # already keeps `_module` out of the evaluated config, but these attrsets are
+  # forwarded verbatim into mkSdkDriftCheck's named formals, which have no
+  # ellipsis to absorb it if that ever changes.
+  cleanSdkDrift =
+    sdkDrift:
+    let
+      base = stripNull (stripModule sdkDrift);
+    in
+    base
+    // lib.optionalAttrs (base ? languages && !lib.isList base.languages) {
+      languages = lib.mapAttrs (_: langCfg: stripNull (stripModule langCfg)) base.languages;
     };
 in
 {

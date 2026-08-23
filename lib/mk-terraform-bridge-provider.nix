@@ -252,13 +252,25 @@ let
     // (removeAttrs base' [ "pythonArgs" ])
   );
 
-  # tfgen emits every language itself, offline, from the same `provider/` module
-  # this build already compiles, so a drift check per language costs one more
-  # run of `pulumi-gen` rather than another toolchain. Opt-in via
+  # A drift check per language re-runs `pulumi-gen`, the binary this build
+  # already compiles, rather than standing up a second toolchain. Opt-in via
   # `sdkDrift.languages`: not every provider repo commits an `sdk/` tree, and a
   # check that cannot find one should not be the default.
-  sdkDriftChecks = lib.genAttrs (sdkDrift.languages or [ ]) (
-    lang:
+  #
+  # `languages` is a list on a pre-delegation bridge, where tfgen codegens every
+  # language in-process and the check needs nothing but the gen tool. A current
+  # bridge shells out to `pulumi package gen-sdk`, so those providers give an
+  # attrset instead and name a `languagePlugin` per language. Both spellings
+  # normalize to the same attrset here; see lib/mk-sdk-drift-check.nix for why
+  # the two eras cannot be told apart from inside the build.
+  langs = sdkDrift.languages or [ ];
+  driftLangs = if lib.isList langs then lib.genAttrs langs (_: { }) else langs;
+
+  # Per-language attrs land last so a language that needs its own `exclude` /
+  # `extraExclude` (dotnet's `logo.png`, say) overrides the block shared by all
+  # of them rather than being overridden by it.
+  sdkDriftChecks = lib.mapAttrs (
+    lang: langArgs:
     mkSdkDriftCheck (
       {
         inherit lang src;
@@ -268,8 +280,9 @@ let
         pulumiGen = pulumi-gen;
       }
       // removeAttrs sdkDrift [ "languages" ]
+      // langArgs
     )
-  );
+  ) driftLangs;
 
   withSdksResult = withSdks (args' // { inherit base; });
 in

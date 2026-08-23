@@ -352,7 +352,6 @@ It also takes an optional `sdkDrift` block, which is what [SDK drift checks](#sd
 
 `sdkDrift.languages` closes that loop.
 For each language listed it re-runs the provider's own `cmdGen` binary - the one the build already compiles - into a scratch directory and `diff -r`s the result against the committed `sdk/<lang>`, emitting `checks.<name>-sdk-<lang>-generated`.
-This is cheap: tfgen emits every language itself, offline, so a drift check costs one more run of an already-built binary rather than another toolchain.
 
 ```nix
 pulumi.terraformBridgeProviders.pulumi-foo = {
@@ -368,9 +367,48 @@ pulumi.terraformBridgeProviders.pulumi-foo = {
 
 The check is check-only: it never appears in `packages`, since its output is an empty marker file.
 
+#### Bridges that delegate codegen
+
+The plain list above assumes the gen tool emits every language itself, in-process and offline.
+That was true of `pulumi-terraform-bridge` for a long time and is no longer.
+On a current bridge, `pkg/tfgen`'s `emitSDK` routes Golang, NodeJS, Python and CSharp through `runPulumiPackageGenSDK`, which shells out to `pulumi package gen-sdk --language <lang>`.
+A drift check on such a provider needs the `pulumi` CLI and that language's host on `PATH`, or the generator never runs at all and the check dies with `exec: "pulumi": executable file not found in $PATH`.
+
+Say so by giving `languages` an attrset instead of a list, naming a `languagePlugin` per language:
+
+```nix
+pulumi.terraformBridgeProviders.pulumi-foo = {
+  # ...
+  sdkDrift.languages = {
+    nodejs.languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
+    python.languagePlugin = pkgs.pulumiPackages.pulumi-python;
+    go.languagePlugin = pkgs.pulumiPackages.pulumi-go;
+    dotnet = {
+      languagePlugin = pulumi2nix.pulumiLanguageDotnet;
+      extraExclude = [ "logo.png" ];
+    };
+  };
+};
+```
+
+.NET has no `pulumi-language-dotnet` in nixpkgs, so it comes from this repo's `pulumiLanguageDotnet`, reachable as the `pulumi2nix` module argument.
+
+Which of the two eras a provider is on is left to you, deliberately.
+It follows from the `pulumi-terraform-bridge` version in the provider's own `provider/go.mod`, which nothing here can read at eval time, and guessing wrong in either direction is worse than asking: a missing plugin fails the check outright, and an unnecessary one drags the `pulumi` closure into a build that never invokes it.
+Naming a plugin is the declaration.
+
+Give `dotnet` `extraExclude = [ "logo.png" ]`.
+`pulumiLanguageDotnet` carries an offline `pulumi_logo_64x64.png` so codegen works in the sandbox at all, which means the `logo.png` it emits is the generic Pulumi icon.
+A committed SDK whose logo came from a real `logoUrl` fetch will therefore always read as drift.
+
+Anything else set on a language (`exclude`, `extraExclude`, `sdkPath`) overrides the surrounding `sdkDrift` block for that language alone.
+
+#### Excludes
+
 `exclude` is the list of basenames `diff -r` skips.
 It defaults to `package-lock.json`, `go.mod`, `go.sum` and `version.txt` - the files tfgen never emits, which are therefore committed by hand and would always read as drift.
 Set `exclude` to replace that list outright, or `extraExclude` to add to it.
+`logo.png` is deliberately not in the default: it is real drift for every language but .NET, so it is opted into per language rather than ignored for everyone.
 
 It is off by default (`languages` starts empty), because it only makes sense where the committed SDK is reproducible from the pinned source:
 

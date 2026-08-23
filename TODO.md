@@ -19,6 +19,13 @@ A tfgen binary does not: it emits every language itself, offline, from the same 
 An `sdks.<lang>.generate = true` that layers `with-generated-sdks.nix`-style behaviour onto the bridge builder with `cmdGen <lang>` as the generator would drop the committed `sdk/` tree entirely.
 The caller-supplied-module-files caveat carries over: tfgen emits sources but no `package-lock.json`/`go.mod`/`go.sum`, so `lockFile`, `goMod` and `goSum` stay required.
 
+## No example exercises `sdkDrift.languages` in its attrset form
+
+`sdkDrift.languages` takes a plain list for a pre-delegation bridge and an attrset of `{ languagePlugin = ...; }` for one whose tfgen shells out to `pulumi package gen-sdk`.
+Only the list form appears in `examples/`, and only as a comment: `examples/pulumi-random` pins 4.14.0, whose bundled bridge still codegens in-process.
+Covering the attrset form end to end means a full Go build of a provider on a current bridge, which no example here does, so both shapes are currently verified by evaluation only - that the option type accepts each and that the plugin reaches `nativeBuildInputs`.
+Whether the generator actually runs under a delegating tfgen has been confirmed only against the downstream consumer in issue #61, not in this repo's CI.
+
 ## Drift checks against providers that vendor their docs
 
 `sdkDrift` is exact only where the gen tool can reproduce the committed SDK offline.
