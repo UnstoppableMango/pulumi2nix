@@ -1,5 +1,13 @@
 # Known Gaps
 
+## pulumipkgs' `pulumi-dotnet` cannot run .NET codegen
+
+`integration/` builds `test-component`'s dotnet SDK with `pkgs.pulumiPackages.pulumi-dotnet` from unmango/pulumipkgs, and that check is expected to fail today.
+Upstream's `getLogo()` in `pulumi-language-dotnet/codegen/gen.go` downloads `logo.png` over HTTP, which the build sandbox forbids, so `pulumi package gen-sdk --language dotnet` cannot run against an unpatched language host.
+This repo works around it in `lib/pulumi-language-dotnet.nix` with a vendored `fetchurl` logo plus `lib/patches/pulumi-language-dotnet-offline-logo.patch`; pulumipkgs ships the same binary without either.
+Closing this means porting that patch into pulumipkgs' `pkgs/languages/pulumi-dotnet`, rebasing it from 3.110.0 onto its 3.112.1, after which `lib/pulumi-language-dotnet.nix` can be retired in favour of the package set.
+Note the version bump may also change the generated `.csproj`, so `integration/` may then need its own `nugetDeps` deps.json rather than the example's.
+
 ## Java SDK generation
 
 `lib/mk-generated-sdk.nix` can drive any language `pulumi package gen-sdk` supports, but nixpkgs' `pulumiPackages` has no `pulumi-language-java` to pass as `languagePlugin`, and there's no pinned build for it here the way `lib/pulumi-language-dotnet.nix` fills the .NET gap.

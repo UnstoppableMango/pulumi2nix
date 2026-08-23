@@ -10,14 +10,14 @@
     src = ./.;
 
     schemaArgs = {
-      languagePlugin = pkgs.pulumiPackages.pulumi-language-nodejs;
+      languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
       lockFile = ./package-lock.json;
       npmDepsHash = "sha256-OJn3at3oJFm1SzJTipit5D+YwBkQpAfFPFK8G+7fMAQ=";
     };
 
     sdks = {
       nodejs = {
-        languagePlugin = pkgs.pulumiPackages.pulumi-language-nodejs;
+        languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
         lockFile = ./generated-sdk/nodejs/package-lock.json;
         npmDepsHash = "sha256-ebZnHsFQZFJ18CNLqRqN3iZ8mfL6wKeTTJJO7F9eV3I=";
       };
