@@ -1,6 +1,7 @@
 {
   lib,
   buildNpmPackage,
+  srcName,
 }:
 # Pulumi's nodejs codegen always emits an SDK that compiles to `bin/` and is
 # published from there once package.json and the license/readme are copied
@@ -23,7 +24,7 @@ buildNpmPackage (
       version
       ;
 
-    sourceRoot = "${src.name}/sdk/nodejs";
+    sourceRoot = "${srcName src}/sdk/nodejs";
 
     postPatch = ''
       cp ${lockFile} package-lock.json

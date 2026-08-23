@@ -1,5 +1,6 @@
 {
   buildGoModule,
+  srcName,
 }:
 # Pulumi's go codegen emits an SDK whose module root is `sdk/go.mod`, one
 # level above the importable package directory. Unlike nodejs/python, a Go
@@ -24,7 +25,7 @@ buildGoModule (
       vendorHash
       ;
 
-    sourceRoot = "${src.name}/sdk";
+    sourceRoot = "${srcName src}/sdk";
 
     # No subPackages/buildPhase override needed: buildGoModule's default
     # buildPhase discovers every directory under sourceRoot containing .go

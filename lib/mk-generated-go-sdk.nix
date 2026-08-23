@@ -6,7 +6,7 @@
 # a `package-lock.json` and `dotnetArgs` a `deps.json`. See the README for how to
 # regenerate them.
 #
-# The output name matters: `lib/sdks/go.nix` derives its `sourceRoot` from `src.name`.
+# The output name matters: `lib/sdks/go.nix` derives its `sourceRoot` from it via `srcName`.
 {
   stdenv,
 }:

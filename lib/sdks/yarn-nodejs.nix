@@ -5,6 +5,7 @@
   yarnConfigHook,
   yarnBuildHook,
   yarnInstallHook,
+  srcName,
 }:
 # Companion to nodejs.nix for hand-written, non-codegen'd nodejs packages
 # that use yarn classic instead of npm, since regenerating a
@@ -29,7 +30,7 @@ stdenv.mkDerivation (
       version
       ;
 
-    sourceRoot = "${src.name}/sdk/nodejs";
+    sourceRoot = "${srcName src}/sdk/nodejs";
 
     nativeBuildInputs = [
       yarnConfigHook

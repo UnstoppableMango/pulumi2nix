@@ -2,18 +2,34 @@
   stdenv,
   buildGoModule,
   fetchFromGitHub,
+  srcName,
 }:
 # Builds only a provider's generated `schema.json`, skipping the resource
 # provider binary and any SDKs. `schemaCommand` is the gen tool invocation
 # that leaves a `schema.json` in the invocation's cwd - callers normally get
 # one supplied by mkTerraformBridgeSchema or mkPulumiSchema rather than
 # calling this directly.
+#
+# `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build
+# from a local checkout or a different fetcher. `owner`/`hash` are only forced
+# by that default, so a caller supplying `src` can omit them. `repo`/`rev` are
+# still used for naming either way.
 {
-  owner,
+  owner ? throw "mk-schema.nix: `owner` is required unless `src` is supplied",
   repo,
   rev ? "v${version}",
   version,
-  hash,
+  hash ? throw "mk-schema.nix: `hash` is required unless `src` is supplied",
+  src ? fetchFromGitHub {
+    name = "source-${repo}-${rev}";
+    inherit
+      owner
+      repo
+      rev
+      hash
+      fetchSubmodules
+      ;
+  },
   vendorHash,
   cmdGen,
   schemaCommand,
@@ -24,17 +40,6 @@
   ...
 }:
 let
-  src = fetchFromGitHub {
-    name = "source-${repo}-${rev}";
-    inherit
-      owner
-      repo
-      rev
-      hash
-      fetchSubmodules
-      ;
-  };
-
   pulumi-gen = buildGoModule {
     pname = cmdGen;
     inherit
@@ -43,7 +48,7 @@ let
       vendorHash
       env
       ;
-    sourceRoot = "${src.name}/provider";
+    sourceRoot = "${srcName src}/provider";
     subPackages = [ "cmd/${cmdGen}" ];
     doCheck = false;
     ldflags = [
@@ -57,7 +62,7 @@ stdenv.mkDerivation {
   pname = "${repo}-schema";
   inherit src version meta;
 
-  sourceRoot = "${src.name}/provider";
+  sourceRoot = "${srcName src}/provider";
   nativeBuildInputs = [ pulumi-gen ];
 
   dontConfigure = true;
