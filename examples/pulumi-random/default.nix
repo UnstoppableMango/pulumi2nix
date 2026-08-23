@@ -33,6 +33,12 @@ in
     # The check is exact for providers that own their docs - the greenfield
     # bridged providers issue #53 is about, whose `make generate` is nothing but
     # `tfgen <lang> --out sdk/<lang>`.
+    #
+    # Note the plain list, not the `{ nodejs.languagePlugin = ...; }` attrset a
+    # provider on a current bridge needs: 4.14.0 vendors a pulumi-terraform-bridge
+    # from before `emitSDK` started shelling out to `pulumi package gen-sdk`, so
+    # its tfgen still codegens in-process and needs no CLI or language host on
+    # PATH. Both spellings stay supported for exactly that reason.
 
     meta = {
       description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider";

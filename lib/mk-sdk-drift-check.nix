@@ -10,10 +10,26 @@
 #
 # `pulumiGen` is the already-built gen tool rather than a rebuild, so the check
 # shares the provider build's derivation instead of paying for a second Go build.
+#
+# That "one more run of an already-built binary" premise only holds for
+# pre-delegation bridges. `pkg/tfgen`'s `emitSDK` used to codegen every language
+# in-process; on a current pulumi-terraform-bridge it routes Golang, NodeJS,
+# Python and CSharp through `runPulumiPackageGenSDK`, which is an
+# `exec.Command("pulumi", "package", "gen-sdk", "--language", <lang>, ...)`. On
+# such a provider the gen tool is a schema producer and a subprocess launcher,
+# and the check needs the `pulumi` CLI plus that language's host on PATH or it
+# dies with `exec: "pulumi": executable file not found in $PATH`.
+#
+# Which era a given provider is on is not something this file can detect - it
+# depends on the bridge version in the provider's own go.mod, which is not
+# readable at eval time. So `languagePlugin` is the caller's declaration of "this
+# provider delegates": passing it adds both tools, omitting it keeps the older,
+# closure-free shape.
 {
   lib,
   stdenv,
   diffutils,
+  pulumi,
   srcName,
 }:
 {
@@ -23,6 +39,13 @@
   src,
   cmdGen,
   pulumiGen,
+
+  # The `pulumi-language-<lang>` host `pulumi package gen-sdk` shells out to,
+  # e.g. `pkgs.pulumiPackages.pulumi-nodejs`; .NET has no nixpkgs build, so use
+  # this repo's `pulumiLanguageDotnet`. Required on a delegating bridge, and
+  # left `null` otherwise: a check whose gen tool never spawns `pulumi` should
+  # not drag the CLI's closure in to satisfy a PATH lookup it will not make.
+  languagePlugin ? null,
 
   # Where the committed tree lives, relative to the source root. Only providers
   # that put their SDKs somewhere other than `sdk/<lang>` need this.
@@ -68,6 +91,10 @@ stdenv.mkDerivation {
   nativeBuildInputs = [
     pulumiGen
     diffutils
+  ]
+  ++ lib.optionals (languagePlugin != null) [
+    pulumi
+    languagePlugin
   ];
 
   dontConfigure = true;
@@ -86,6 +113,12 @@ stdenv.mkDerivation {
 
     generated="$NIX_BUILD_TOP/generated-${lang}"
     mkdir -p "$generated"
+
+    # A delegating bridge runs the `pulumi` CLI, which insists on a writable
+    # home for its plugin cache and credentials file. Same reason
+    # lib/mk-generated-sdk.nix sets it; harmless when the gen tool codegens
+    # in-process and never looks.
+    export HOME=$TMPDIR
     ${cmdGen} ${lang} --out "$generated"
 
     if ! diff -r -u ${excludeFlags} ${lib.escapeShellArg sdkPath} "$generated" \

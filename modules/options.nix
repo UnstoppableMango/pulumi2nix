@@ -67,10 +67,26 @@ let
     };
   };
 
-  # tfgen emits every language SDK itself, offline, from the same `provider/`
-  # module the provider build already compiles, so a bridged provider can check
-  # its committed `sdk/<lang>` against a freshly generated one. Nothing else
-  # does: the SDK builds consume whatever is committed, stale or not.
+  # A bridged provider's gen tool can regenerate its own `sdk/<lang>`, so the
+  # committed tree can be checked against a fresh run. Nothing else does: the
+  # SDK builds consume whatever is committed, stale or not.
+  sdkDriftLanguage = types.submodule {
+    freeformType = types.attrsOf types.raw;
+
+    options.languagePlugin = mkOption {
+      type = types.nullOr types.package;
+      default = null;
+      description = ''
+        The `pulumi-language-<lang>` host this language's codegen runs through,
+        e.g. `pkgs.pulumiPackages.pulumi-nodejs`. .NET has no nixpkgs build; use
+        this repo's `pulumi2nix.pulumiLanguageDotnet`.
+
+        Required on a bridge that delegates codegen, ignored on one that does
+        not. Setting it also puts the `pulumi` CLI on the check's PATH.
+      '';
+    };
+  };
+
   sdkDrift = {
     sdkDrift = mkOption {
       type = types.submodule {
@@ -78,12 +94,35 @@ let
 
         options = {
           languages = mkOption {
-            type = types.listOf types.str;
+            type = types.either (types.listOf types.str) (types.attrsOf sdkDriftLanguage);
             default = [ ];
             description = ''
               tfgen languages whose committed `sdk/<lang>` is compared against a
               fresh `cmdGen <lang> --out` run, one `checks.<name>-sdk-<lang>-generated`
               each.
+
+              Two shapes, for the two eras of tfgen. A plain list is enough on an
+              older `pulumi-terraform-bridge`, whose `emitSDK` codegens every
+              language in-process and offline. A current bridge instead shells
+              out to `pulumi package gen-sdk --language <lang>`, so those
+              providers pass an attrset and name a `languagePlugin` per language:
+
+              ```nix
+              sdkDrift.languages = {
+                nodejs.languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
+                dotnet = {
+                  languagePlugin = pulumi2nix.pulumiLanguageDotnet;
+                  extraExclude = [ "logo.png" ];
+                };
+              };
+              ```
+
+              Which era a provider is on is left to the caller, deliberately: it
+              follows from the bridge version in the provider's own `go.mod`,
+              which nothing here can read at eval time. Naming a plugin is the
+              declaration. Anything else set per language (`exclude`,
+              `extraExclude`, `sdkPath`) overrides the surrounding block for
+              that language alone.
 
               Empty by default: not every provider repo commits an `sdk/` tree,
               and a check with nothing to compare against would only ever fail.
