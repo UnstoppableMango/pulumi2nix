@@ -1,4 +1,5 @@
 {
+  lib,
   buildNpmPackage,
   srcName,
 }:
@@ -12,6 +13,13 @@
   src,
   version,
   lockFile,
+  # Runtime dependencies the output does not carry a copy of. `@pulumi/pulumi`
+  # has to be a singleton in the consuming process - its Node runtime keeps the
+  # resource monitor address and config at module scope - and node and bun both
+  # resolve through the realpath of a symlink, so an SDK carrying its own copy
+  # ends up talking to a different runtime than the program that imported it.
+  # Set to `[ ]` to ship the whole pruned tree.
+  omitDeps ? [ "@pulumi/pulumi" ],
   ...
 }@args:
 buildNpmPackage (
@@ -47,13 +55,38 @@ buildNpmPackage (
       mkdir -p "$packageOut"
       cp -r bin/. "$packageOut/"
 
+      ${lib.optionalString (omitDeps != [ ]) ''
+        # Only the build tree's package.json: the shipped copy was taken in
+        # postBuild and still declares these, so what the output says about
+        # itself stays upstream's. Dropping them here is what lets the prune
+        # below take their transitive-only dependencies along with them.
+        node -e '
+          const fs = require("fs");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          for (const name of process.argv.slice(1)) delete (pkg.dependencies ?? {})[name];
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
+        ' ${lib.escapeShellArgs omitDeps}
+      ''}
+
       if [ -z "''${dontNpmPrune-}" ]; then
         npm prune --omit=dev --no-save
       fi
-      cp -r node_modules "$packageOut/node_modules"
+
+      # An emptied scope directory (`@pulumi/`) is still a directory, so clear
+      # those before asking whether any package is left. Testing for a directory
+      # rather than for any entry at all is what keeps npm's own bookkeeping
+      # file (`node_modules/.package-lock.json`) from passing for content: an
+      # SDK whose only runtime dependency was omitted ships no node_modules.
+      find node_modules -maxdepth 1 -type d -empty -delete
+      if [ -n "$(find node_modules -mindepth 1 -maxdepth 1 -type d 2>/dev/null)" ]; then
+        cp -r node_modules "$packageOut/node_modules"
+      fi
 
       runHook postInstall
     '';
   }
-  // (removeAttrs args [ "lockFile" ])
+  // (removeAttrs args [
+    "lockFile"
+    "omitDeps"
+  ])
 )

@@ -19,6 +19,13 @@
   version,
   yarnLockFile,
   yarnDepsHash,
+  # As npm.nix's `omitDeps`, with one difference: yarn classic has no real
+  # `prune` (its own `prune` is a stub pointing at `install`), and by the time
+  # yarnInstallHook has run there is nothing left to re-resolve against. So the
+  # named packages are deleted from the installed tree rather than pruned out of
+  # it, and anything that was reachable only through them stays behind. Nothing
+  # resolves to those leftovers; they are just dead weight.
+  omitDeps ? [ "@pulumi/pulumi" ],
   ...
 }@args:
 stdenv.mkDerivation (
@@ -49,10 +56,25 @@ stdenv.mkDerivation (
         -e 's/"version": ".*"/"version": "${version}"/' \
         package.json
     '';
+
+    # yarnInstallHook derives the package directory from package.json with jq,
+    # which isn't an input here, so find the installed tree by glob instead -
+    # one pattern for a plain name, one for a scoped one.
+    postInstall = lib.optionalString (omitDeps != [ ]) ''
+      shopt -s nullglob
+      for nodeModules in "$out"/lib/node_modules/*/node_modules "$out"/lib/node_modules/@*/*/node_modules; do
+        for dep in ${lib.escapeShellArgs omitDeps}; do
+          rm -rf "$nodeModules/$dep"
+        done
+        find "$nodeModules" -maxdepth 1 -type d -empty -delete
+        rmdir "$nodeModules" 2>/dev/null || true
+      done
+    '';
   }
   // lib.optionalAttrs (!(args ? yarnBuildScript)) { dontYarnBuild = true; }
   // (removeAttrs args [
     "yarnLockFile"
     "yarnDepsHash"
+    "omitDeps"
   ])
 )

@@ -125,12 +125,30 @@ let
     repo's `pulumi2nix.pulumiLanguageDotnet`.
   '';
 
+  # Both nodejs builders bundle their pruned `node_modules` into the output, so
+  # both take the same escape hatch out of it. `null` leaves the builder's own
+  # default of `[ "@pulumi/pulumi" ]`, dropped by `toLangArgs` when unset.
+  omitDeps = mkOption {
+    type = types.nullOr (types.listOf types.str);
+    default = null;
+    description = ''
+      Runtime dependencies this SDK's output does not carry a copy of
+      (default: `[ "@pulumi/pulumi" ]`). `@pulumi/pulumi` has to be a singleton
+      in the consuming process, and node and bun resolve through the realpath of
+      a symlink, so an SDK carrying its own copy talks to a different runtime
+      than the program that imported it. Set to `[ ]` to ship the whole pruned
+      tree.
+    '';
+  };
+
   nodejsCommon = {
+    inherit omitDeps;
     lockFile = required types.raw "`package-lock.json` for the SDK's dependencies.";
     npmDepsHash = required types.str "Hash of the SDK's npm dependencies.";
   };
 
   yarnCommon = {
+    inherit omitDeps;
     yarnLockFile = required types.raw "`yarn.lock` for the SDK's dependencies.";
     yarnDepsHash = required types.str "Hash of the SDK's yarn dependencies.";
   };
