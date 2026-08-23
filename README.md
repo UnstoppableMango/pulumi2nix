@@ -155,6 +155,18 @@ Layered SDKs take a lang-qualified derivation name, `<repo>-sdk-<lang>`, matchin
 Set `pname` on the individual `sdks.<lang>` block (or `<lang>Args`) to override it.
 
 `sourceRoot` is resolved from the `src`'s name, so any fetcher output, a `lib.cleanSourceWith`, a plain path, and a store path all work.
+A path value is handled on its own terms: taking one as a build input copies it into the store under its own basename, so the name `sourceRoot` is built from keeps that basename whole rather than treating a leading hash as the store's.
+That matters for a path that already lives in the store, whose basename is itself `<hash>-<name>`.
+
+`lib.fileset.toSource` is the preferred way to hand in a local checkout, because it names its result explicitly instead of leaving the name to be recovered from a store path:
+
+```nix
+src = lib.fileset.toSource {
+  root = ./.;
+  fileset = lib.fileset.unions [ ./provider ./sdk ];
+};
+```
+
 Note the caveat below about `src = ./.` inside a flake only seeing git-tracked files.
 
 ### Narrowed SDK sources
