@@ -8,16 +8,16 @@ Closing this means packaging `pulumi/pulumi-java`'s language host, then register
 ## Python SDKs for component providers
 
 `lib/with-generated-sdks.nix` throws on `pythonArgs`: only the languages registered in `lib/sdks` (nodejs, yarnNodejs, go, dotnet) are available for source-based component providers.
-`mkPulumiPackage`/`mkTerraformBridgeProvider` don't have this gap - they delegate python to nixpkgs' upstream builder, which has no equivalent for a generated SDK tree.
+`mkPulumiPackage`/`mkTerraformBridgeProvider` don't have this gap - they delegate python to nixpkgs' upstream builder, which `mk-terraform-bridge-provider.nix` points at `mkGeneratedSdk` output when `sdks.python.generate` is set, sidestepping `with-generated-sdks.nix` entirely.
+Registering that path in `lib/sdks` would close this properly, but a component provider's python SDK also needs the version/`pkg_resources` patching `mkPythonPackage` carries, which currently lives in the bridge builder rather than in a reusable SDK builder.
 The flake module mirrors this: `pulumi.componentPackages.<name>.sdks` has no `python` option, while `pulumi.nativeProviders`/`terraformBridgeProviders` do.
 
-## SDK generation for bridged providers
+## Generated bridged SDKs do not get tfgen's language overlays
 
-`sdkDrift` (see the README) checks a bridged provider's committed `sdk/<lang>` against a fresh tfgen run, but the generation half still lives outside pulumi2nix.
-`lib/with-generated-sdks.nix` exists for exactly this and is only wired to `mkComponentPackage`, because its generator is `pulumi package gen-sdk`, which needs a per-language `languagePlugin`.
-A tfgen binary does not: it emits every language itself, offline, from the same `provider/` module the build already compiles.
-An `sdks.<lang>.generate = true` that layers `with-generated-sdks.nix`-style behaviour onto the bridge builder with `cmdGen <lang>` as the generator would drop the committed `sdk/` tree entirely.
-The caller-supplied-module-files caveat carries over: tfgen emits sources but no `package-lock.json`/`go.mod`/`go.sum`, so `lockFile`, `goMod` and `goSum` stay required.
+`sdks.<lang>.generate = true` (see the README) codegens a bridged provider's SDK from its schema with `pulumi package gen-sdk`, which is the same command a current tfgen delegates to, but it is only the codegen step.
+tfgen's per-language overlays - `info.JavaScript.Overlay`, `info.Golang.Overlay` and friends, the hand-written files a provider's `resources.go` splices into its SDKs around codegen - are not represented in the schema, so nothing downstream of it can replay them.
+A provider that ships overlays gets an SDK that silently lacks them, and has to keep its committed `sdk/` tree with an `sdkDrift` check instead.
+Closing this means running the provider's own `cmdGen <lang>` as the generator rather than `gen-sdk`, which is a second generator to build and maintain, and on a delegating bridge needs the `pulumi` CLI and the language plugin anyway.
 
 ## No example exercises `sdkDrift.languages` in its attrset form
 
