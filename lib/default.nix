@@ -46,6 +46,10 @@ let
     # packages that don't ship one upstream (e.g. component providers).
     mkGeneratedSdk = callPackage ./mk-generated-sdk.nix { };
 
+    # Attaches a caller-supplied `go.mod`/`go.sum` to a generated go SDK's source tree,
+    # which `pulumi package gen-sdk` never emits.
+    mkGeneratedGoSdk = callPackage ./mk-generated-go-sdk.nix { };
+
     # Extracts schema.json from a source-based, multi-language component provider
     # via `pulumi package get-schema`, rather than building a separate gen tool.
     mkComponentSchema = callPackage ./mk-component-schema.nix { };
