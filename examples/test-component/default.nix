@@ -18,12 +18,19 @@ mkComponentPackage {
     lockFile = ./generated-sdk/nodejs/package-lock.json;
     npmDepsHash = "sha256-ebZnHsFQZFJ18CNLqRqN3iZ8mfL6wKeTTJJO7F9eV3I=";
   };
+  goArgs = {
+    languagePlugin = pulumiPackages.pulumi-go;
+    importBasePath = "github.com/UnstoppableMango/pulumi2nix/examples/test-component/sdk/go/testcomponent";
+    goMod = ./generated-sdk/go/go.mod;
+    goSum = ./generated-sdk/go/go.sum;
+    vendorHash = "sha256-KBwE+KOipz+yPcyF6c79ujx20Mm2qVpT3Lhk0hNhv88=";
+  };
   dotnetArgs = {
     languagePlugin = pulumiLanguageDotnet;
     nugetDeps = ./generated-sdk/dotnet/deps.json;
   };
   meta = {
-    description = "pulumi2nix example: minimal component provider via mkComponentPackage (schema + generated nodejs/dotnet SDKs)";
+    description = "pulumi2nix example: minimal component provider via mkComponentPackage (schema + generated nodejs/go/dotnet SDKs)";
     license = lib.licenses.asl20;
     maintainers = [ ];
   };

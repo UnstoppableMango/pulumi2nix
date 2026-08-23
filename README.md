@@ -31,6 +31,7 @@ Every builder above separates schema extraction from binary packaging, so `schem
 
 - **Language SDK generation.**
 `mkGeneratedSdk` runs `pulumi package gen-sdk` against a `schema.json` output using the target language's `pulumi-language-<lang>` plugin, covering Node.js, Python, and Go from nixpkgs' `pulumiPackages`, and .NET via this repo's own pinned `pulumi-language-dotnet` build (upstream `pulumi/pulumi-dotnet` has no packaged language host in nixpkgs). Java support is not yet implemented.
+Go additionally goes through `mkGeneratedGoSdk`, which attaches the `go.mod`/`go.sum` pair that `gen-sdk` never emits.
 
 ## Usage
 
@@ -250,6 +251,31 @@ Write args interfaces as plain, explicit fields instead.
 **Untracked files.**
 `src = ./.` in a flake only sees git-tracked files, so a newly added `PulumiPlugin.yaml` or lockfile needs `git add`ing before the build can see it - otherwise `mkComponentPackage`'s "expected PulumiPlugin.yaml" check fails misleadingly.
 
+**Go module files.**
+`pulumi package gen-sdk --language go` emits only `.go` sources: no `go.mod`, no `go.sum`.
+A Go module path is external convention that upstream provider repos maintain by hand, and filling in a `require` block needs a real `go mod tidy` against the network, which a sandboxed derivation can't do.
+So `goArgs` takes both files from the caller, the same way `nodejsArgs` takes a `package-lock.json`, plus an `importBasePath` - without it codegen falls back to an `example.com/...` path and writes self-imports that don't match the directories it just created, so the SDK cannot compile.
+
+Regenerate them like this, then `git add` the results:
+
+```sh
+nix build .#your-package.schema --out-link /tmp/schema
+
+tmp=$(mktemp -d); cd "$tmp"
+jq '.language.go.importBasePath = "github.com/you/your-repo/sdk/go/yourcomponent"' \
+  /tmp/schema/schema.json > schema.json
+
+nix shell nixpkgs#pulumi nixpkgs#pulumiPackages.pulumi-go -c \
+  pulumi package gen-sdk schema.json --language go --out .
+
+nix shell nixpkgs#go -c go mod init github.com/you/your-repo/sdk
+nix shell nixpkgs#go -c go mod tidy
+```
+
+`importBasePath` is the module path plus `/go/<dir>`; its last segment becomes the package directory under `go/`.
+Keep the resulting `go` directive at or below the `go` version in your pinned nixpkgs, so the sandbox never tries to download a toolchain.
+Then set `vendorHash = lib.fakeHash` and read the real hash out of the first build failure.
+
 ### `mkComponentPackage`
 
 Packages a source-based component provider and layers generated SDKs on top of its extracted schema, since this provider shape has no compiled resource binary to build.
@@ -271,6 +297,13 @@ mkComponentPackage {
     lockFile = ./generated-sdk/nodejs/package-lock.json;
     npmDepsHash = "sha256-...";
   };
+  goArgs = {
+    languagePlugin = pulumiPackages.pulumi-go;
+    importBasePath = "github.com/you/your-repo/sdk/go/yourcomponent";
+    goMod = ./generated-sdk/go/go.mod;
+    goSum = ./generated-sdk/go/go.sum;
+    vendorHash = "sha256-...";
+  };
   dotnetArgs = {
     languagePlugin = pulumiLanguageDotnet;
     nugetDeps = ./generated-sdk/dotnet/deps.json;
@@ -282,7 +315,8 @@ mkComponentPackage {
 ### `mkGeneratedSdk`
 
 The lower-level builder `<lang>Args` blocks resolve to under `mkComponentPackage`: runs `pulumi package gen-sdk` against a `schema.json` derivation, using the target language's `pulumi-language-<lang>` plugin.
-Called directly, it is given a schema derivation (anything exposing `$out/schema.json`, e.g. the output of `mkPulumiSchema` or `mkComponentSchema`) rather than a whole package:
+Called directly, it is given a schema derivation (anything exposing `$out/schema.json`, e.g. the output of `mkPulumiSchema` or `mkComponentSchema`) rather than a whole package.
+An optional `schemaOverrides` attrset is merged into the schema before codegen runs, which is how per-language settings get into a schema extracted from source (`mkComponentSchema` output carries none):
 
 ```nix
 { mkGeneratedSdk, pulumiPackages }:
@@ -292,7 +326,29 @@ mkGeneratedSdk {
   schema = mkComponentSchema { /* ... */ };
   lang = "nodejs";
   languagePlugin = pulumiPackages.pulumi-language-nodejs;
+  # schemaOverrides.language.go.importBasePath = "github.com/you/your-repo/sdk/go/yourcomponent";
   meta.license = lib.licenses.asl20;
+}
+```
+
+### `mkGeneratedGoSdk`
+
+Completes `mkGeneratedSdk`'s go output into a buildable module by copying a caller-supplied `go.mod`/`go.sum` into the module root, producing the `sdk/{go.mod,go.sum,go/...}` layout `lib/sdks/go.nix` expects.
+`goArgs` under `mkComponentPackage` wires this up automatically; see **Go module files** above for how to produce the two files.
+
+```nix
+{ mkGeneratedGoSdk, mkGeneratedSdk, pulumiPackages }:
+mkGeneratedGoSdk {
+  pname = "test-component";
+  version = "0.0.1";
+  src = mkGeneratedSdk {
+    lang = "go";
+    languagePlugin = pulumiPackages.pulumi-go;
+    schemaOverrides.language.go.importBasePath = "github.com/you/your-repo/sdk/go/yourcomponent";
+    # ...
+  };
+  goMod = ./generated-sdk/go/go.mod;
+  goSum = ./generated-sdk/go/go.sum;
 }
 ```
 

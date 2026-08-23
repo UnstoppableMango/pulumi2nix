@@ -7,6 +7,7 @@
   lib,
   sdkBuilders,
   mkGeneratedSdk,
+  mkGeneratedGoSdk,
   langArgNames,
 }:
 {
@@ -28,6 +29,49 @@ assert
 let
   argNames = langArgNames args;
 
+  # Go is the one generated SDK that isn't self-contained. Its codegen needs
+  # `language.go.importBasePath` in the schema to emit self-imports matching the
+  # directories it writes, and it emits no `go.mod`/`go.sum` at all, so both the
+  # module path and the module files come from the caller. Consumed here, never
+  # forwarded to sdkBuilders.go.
+  goOnlyArgs = [
+    "importBasePath"
+    "goMod"
+    "goSum"
+  ];
+
+  missingGoArgs = lib.optionals (args ? goArgs) (
+    lib.filter (name: !(args.goArgs ? ${name})) goOnlyArgs
+  );
+
+  mkSrc =
+    lang: langArgs:
+    let
+      generated = mkGeneratedSdk (
+        {
+          inherit
+            schema
+            pname
+            version
+            meta
+            lang
+            ;
+          inherit (langArgs) languagePlugin;
+        }
+        // lib.optionalAttrs (lang == "go") {
+          schemaOverrides.language.go.importBasePath = langArgs.importBasePath;
+        }
+      );
+    in
+    if lang == "go" then
+      mkGeneratedGoSdk {
+        inherit pname version meta;
+        src = generated;
+        inherit (langArgs) goMod goSum;
+      }
+    else
+      generated;
+
   mkSdk =
     lang: langArgs:
     (sdkBuilders.${lang}
@@ -41,35 +85,36 @@ let
       let
         lang = lib.removeSuffix "Args" argName;
         langArgs = args.${argName};
-        generatedSrc = mkGeneratedSdk {
-          inherit
-            schema
-            pname
-            version
-            meta
-            lang
-            ;
-          inherit (langArgs) languagePlugin;
-        };
       in
       {
         name = lang;
         value = mkSdk lang (
           {
             inherit pname meta version;
-            src = generatedSrc;
+            src = mkSrc lang langArgs;
           }
-          // (removeAttrs langArgs [ "languagePlugin" ])
+          // (removeAttrs langArgs ([ "languagePlugin" ] ++ goOnlyArgs))
         );
       }
     ) argNames
   );
 in
-if extraSdks == { } then
-  base
-else
-  base.overrideAttrs (old: {
-    passthru = old.passthru // {
-      sdks = (old.passthru.sdks or { }) // extraSdks;
-    };
-  })
+lib.throwIf (missingGoArgs != [ ])
+  ''
+    withGeneratedSdks: `goArgs` is missing ${lib.concatStringsSep ", " missingGoArgs}.
+    `pulumi package gen-sdk --language go` emits only .go sources, so a generated go
+    SDK additionally needs `importBasePath` (the schema's `language.go.importBasePath`,
+    without which codegen writes self-imports that don't match the directories it just
+    created) plus a `go.mod`/`go.sum` pair, the same way `nodejsArgs` needs a
+    `package-lock.json`. See the README for how to regenerate them.
+  ''
+  (
+    if extraSdks == { } then
+      base
+    else
+      base.overrideAttrs (old: {
+        passthru = old.passthru // {
+          sdks = (old.passthru.sdks or { }) // extraSdks;
+        };
+      })
+  )
