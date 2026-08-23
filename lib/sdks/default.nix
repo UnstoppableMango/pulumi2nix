@@ -1,7 +1,7 @@
 { callPackage }:
 {
-  nodejs = callPackage ./nodejs.nix { };
-  yarnNodejs = callPackage ./yarn-nodejs.nix { };
+  nodejs = callPackage ./npm.nix { };
+  yarnNodejs = callPackage ./yarn.nix { };
   go = callPackage ./go.nix { };
   dotnet = callPackage ./dotnet.nix { };
 }

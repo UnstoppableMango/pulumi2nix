@@ -7,10 +7,10 @@
   yarnInstallHook,
   srcName,
 }:
-# Companion to nodejs.nix for hand-written, non-codegen'd nodejs packages
+# Companion to npm.nix for hand-written, non-codegen'd nodejs packages
 # that use yarn classic instead of npm, since regenerating a
 # package-lock.json from yarn.lock corrupts its resolved URLs. Produces the
-# same $out/lib/node_modules/<pkgName> output shape as nodejs.nix so callers
+# same $out/lib/node_modules/<pkgName> output shape as npm.nix so callers
 # don't need to care which one is used.
 {
   meta ? { },
