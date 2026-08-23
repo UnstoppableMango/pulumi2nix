@@ -113,7 +113,7 @@ lib.throwIf (missingGoArgs != [ ])
       base
     else
       base.overrideAttrs (old: {
-        passthru = old.passthru // {
+        passthru = (old.passthru or { }) // {
           sdks = (old.passthru.sdks or { }) // extraSdks;
         };
       })
