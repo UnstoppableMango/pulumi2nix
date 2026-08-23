@@ -66,6 +66,14 @@
               inherit (config.pulumi.lib) narrowSdkSrc;
             };
 
+            # Same reasoning, for the `sourceRoot` name the same `src` resolves
+            # to. Kept separate from narrow-sdk-src so a failure names which of
+            # the two decisions went wrong.
+            src-name = import ./checks/src-name.nix {
+              inherit lib pkgs;
+              inherit (config.pulumi.lib) srcName;
+            };
+
             # Filtered to .nix files so an unrelated README edit doesn't rebuild it.
             nix-lint =
               let
