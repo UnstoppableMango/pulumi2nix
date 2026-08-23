@@ -20,22 +20,21 @@
     inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = import inputs.systems;
-      imports = [ inputs.treefmt-nix.flakeModule ];
+      imports = [
+        inputs.treefmt-nix.flakeModule
+        ./modules/flake-module.nix
+      ];
 
       flake.lib = import ./lib;
       flake.overlays.default = import ./lib/overlay.nix;
+      flake.flakeModules.default = ./modules/flake-module.nix;
 
       perSystem =
-        { pkgs, ... }:
+        { config, pkgs, ... }:
         let
-          flakeLib = import ./lib { inherit pkgs; };
-          examples = import ./examples {
-            inherit pkgs;
-            inherit flakeLib;
-          };
           overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);
           tools = {
-            pulumi-language-dotnet = flakeLib.pulumiLanguageDotnet;
+            pulumi-language-dotnet = config.pulumi.lib.pulumiLanguageDotnet;
             # Exercises flake.overlays.default itself, not just flake.lib's curried-builder path.
             # Same build recipe/output as pulumi-language-dotnet above, so this proves the
             # overlay wires a real derivation without paying for a second build.
@@ -43,14 +42,15 @@
           };
         in
         {
-          packages =
-            examples
-            // tools
-            // {
-              default = pkgs.linkFarm "pulumi2nix-examples" examples;
-            };
+          # Every example declares itself through the flake module's options,
+          # which is what populates packages/checks below.
+          imports = [ ./examples ];
 
-          checks = examples // tools;
+          packages = tools // {
+            default = pkgs.linkFarm "pulumi2nix-examples" config.pulumi.packages;
+          };
+
+          checks = tools;
 
           devShells.default = pkgs.mkShellNoCC {
             packages = with pkgs; [

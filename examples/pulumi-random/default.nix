@@ -1,19 +1,29 @@
-{ lib, mkTerraformBridgeProvider }:
-mkTerraformBridgeProvider rec {
-  owner = "pulumi";
+{ lib, ... }:
+let
   repo = "pulumi-random";
   version = "4.14.0";
-  hash = "sha256-1MR7zWNBDbAUoRed7IU80PQxeH18x95MKJKejW5m2Rs=";
-  vendorHash = "sha256-YDuF89F9+pxVq4TNe5l3JlbcqpnJwSTPAP4TwWTriWA=";
-  cmdGen = "pulumi-tfgen-random";
-  cmdRes = "pulumi-resource-random";
-  extraLdflags = [ "-X github.com/pulumi/${repo}/provider/v4/pkg/version.Version=v${version}" ];
-  __darwinAllowLocalNetworking = true;
-  meta = {
-    description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider";
-    mainProgram = "pulumi-resource-random";
-    homepage = "https://github.com/pulumi/pulumi-random";
-    license = lib.licenses.asl20;
-    maintainers = [ ];
+in
+{
+  pulumi.terraformBridgeProviders.${repo} = {
+    inherit repo version;
+
+    owner = "pulumi";
+    hash = "sha256-1MR7zWNBDbAUoRed7IU80PQxeH18x95MKJKejW5m2Rs=";
+    vendorHash = "sha256-YDuF89F9+pxVq4TNe5l3JlbcqpnJwSTPAP4TwWTriWA=";
+    cmdGen = "pulumi-tfgen-random";
+    cmdRes = "pulumi-resource-random";
+    extraLdflags = [ "-X github.com/pulumi/${repo}/provider/v4/pkg/version.Version=v${version}" ];
+
+    # Not a declared option: reaches buildGoModule through the submodule's
+    # freeformType, the same escape hatch the builders themselves rely on.
+    __darwinAllowLocalNetworking = true;
+
+    meta = {
+      description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider";
+      mainProgram = "pulumi-resource-random";
+      homepage = "https://github.com/pulumi/pulumi-random";
+      license = lib.licenses.asl20;
+      maintainers = [ ];
+    };
   };
 }

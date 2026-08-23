@@ -1,0 +1,154 @@
+# Reusable groups of options, merged into the per-builder submodules in
+# options.nix. Each group is a plain attrset of `mkOption`s rather than a
+# module, so a tree that needs a different default (e.g. mkDynamicBridgeProvider
+# defaulting `owner`/`repo`) can override a single entry with `//`.
+#
+# Types stay deliberately loose wherever the underlying builder is loose:
+# `src` accepts a plain path, a store path, or a fetcher output (lib/src-name.nix
+# resolves all three), so it is `raw` rather than `types.package`.
+{ lib }:
+let
+  inherit (lib) mkOption types;
+
+  # Optional args are `null` by default and stripped before reaching a builder.
+  # The builders test presence with `args.owner or (throw ...)`, so a literal
+  # `owner = null` would satisfy `?` and slip a null into fetchFromGitHub.
+  optional =
+    type: description:
+    mkOption {
+      type = types.nullOr type;
+      default = null;
+      inherit description;
+    };
+
+  required =
+    type: description:
+    mkOption {
+      inherit type description;
+    };
+in
+rec {
+  # Carried by every builder.
+  common = {
+    version = required types.str ''
+      Package version. Also the default `rev` (as `v''${version}`) for builders
+      that fetch from GitHub.
+    '';
+
+    meta = mkOption {
+      type = types.attrsOf types.raw;
+      default = { };
+      description = "Standard nixpkgs `meta` attrset, forwarded verbatim.";
+    };
+  };
+
+  # Everything the upstream-repo fetch and the Go build need. Shared by every
+  # schema/provider builder that starts from a Pulumi provider repo.
+  upstream = {
+    owner = optional types.str ''
+      GitHub owner for the default fetch. Required unless `src` is supplied.
+    '';
+
+    repo = required types.str ''
+      GitHub repo name. Required either way: it names the derivation as well as
+      the default fetch.
+    '';
+
+    rev = optional types.str ''
+      Git revision for the default fetch. Defaults to `v''${version}`.
+    '';
+
+    hash = optional types.str ''
+      Hash of the default fetch. Required unless `src` is supplied.
+    '';
+
+    src = optional types.raw ''
+      Source tree, overriding the default `fetchFromGitHub` of
+      `owner`/`repo`/`rev`/`hash`. Accepts a plain path, a store path, or any
+      fetcher output. When set, `owner` and `hash` may be omitted.
+    '';
+
+    fetchSubmodules = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Passed through to the default `fetchFromGitHub`.";
+    };
+
+    vendorHash = required types.str ''
+      Go module vendor hash for the provider build under `provider/`.
+    '';
+
+    extraLdflags = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      description = ''
+        Appended to the `-s -w` ldflags. Conventionally carries the
+        `-X .../version.Version=v''${version}` stamp.
+      '';
+    };
+
+    env = mkOption {
+      type = types.attrsOf types.raw;
+      default = { };
+      description = "Extra environment forwarded into `buildGoModule`.";
+    };
+  };
+
+  # The two `cmd/<name>` binaries a provider repo builds.
+  goCmds = {
+    cmdGen = required types.str ''
+      Name of the schema-generation command under `provider/cmd/`, e.g.
+      `pulumi-tfgen-random` or `pulumi-gen-command`.
+    '';
+
+    cmdRes = required types.str ''
+      Name of the resource plugin command under `provider/cmd/`, e.g.
+      `pulumi-resource-random`.
+    '';
+  };
+
+  # Source-based (component) providers name themselves rather than deriving a
+  # pname from `repo`.
+  componentSource = {
+    pname = required types.str "Package name.";
+
+    src = required types.raw ''
+      The component provider's source tree: a directory carrying a
+      `PulumiPlugin.yaml` at its root.
+
+      Note `src = ./.` inside a flake only sees git-tracked files, so an
+      untracked `PulumiPlugin.yaml` or lockfile must be `git add`ed first.
+    '';
+  };
+
+  # `pulumi package get-schema` needs a language host plus an offline npm cache.
+  componentSchema = {
+    languagePlugin = required types.package ''
+      The `pulumi-language-<runtime>` host that serves the component's
+      `GetSchema` RPC, e.g. `pkgs.pulumiPackages.pulumi-language-nodejs`.
+    '';
+
+    lockFile = required types.raw "The component's own `package-lock.json`.";
+
+    npmDepsHash = required types.str "Hash of the component's npm dependencies.";
+
+    sourceRoot = optional types.str "Subdirectory of `src` holding `PulumiPlugin.yaml`.";
+
+    providerPlugins = mkOption {
+      type = types.listOf (
+        types.submodule {
+          options = {
+            name = required types.str "Provider plugin name, e.g. `github`.";
+            version = required types.str "Provider plugin version.";
+            plugin = required types.raw "Extracted `pulumi-resource-<name>` tree.";
+          };
+        }
+      );
+      default = [ ];
+      description = ''
+        Seeds the plugin cache for components importing another provider's SDK,
+        which `get-schema` would otherwise try to download with no network.
+      '';
+    };
+  };
+}
