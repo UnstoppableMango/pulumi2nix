@@ -67,6 +67,56 @@ let
     };
   };
 
+  # tfgen emits every language SDK itself, offline, from the same `provider/`
+  # module the provider build already compiles, so a bridged provider can check
+  # its committed `sdk/<lang>` against a freshly generated one. Nothing else
+  # does: the SDK builds consume whatever is committed, stale or not.
+  sdkDrift = {
+    sdkDrift = mkOption {
+      type = types.submodule {
+        freeformType = types.attrsOf types.raw;
+
+        options = {
+          languages = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            description = ''
+              tfgen languages whose committed `sdk/<lang>` is compared against a
+              fresh `cmdGen <lang> --out` run, one `checks.<name>-sdk-<lang>-generated`
+              each.
+
+              Empty by default: not every provider repo commits an `sdk/` tree,
+              and a check with nothing to compare against would only ever fail.
+            '';
+          };
+
+          exclude = mkOption {
+            type = types.nullOr (types.listOf types.str);
+            default = null;
+            description = ''
+              Basenames `diff -r` skips, replacing the builder's default of
+              `package-lock.json`, `go.mod`, `go.sum`, `version.txt` - the files
+              tfgen never emits, which are therefore committed by hand and would
+              always read as drift. Use `extraExclude` to add to that default
+              rather than restate it.
+            '';
+          };
+
+          extraExclude = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            description = "Appended to `exclude`, whatever it ends up being.";
+          };
+        };
+      };
+      default = { };
+      description = ''
+        Drift checks for this provider's committed SDK trees. Off unless
+        `languages` is non-empty.
+      '';
+    };
+  };
+
   # Base for the two repo-fetching provider builders. `cmdRes` and checked-in
   # SDK layering are what separate these from schemaBase.
   providerBase =
@@ -121,7 +171,7 @@ in
     }
   );
 
-  terraformBridgeProviders = tree providerBase;
+  terraformBridgeProviders = tree (providerBase // sdkDrift);
 
   dynamicBridgeProviders = tree (
     (removeAttrs (common // upstream) [

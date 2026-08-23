@@ -3,6 +3,7 @@
   buildGoModule,
   fetchProviderSource,
   python3Packages,
+  mkSdkDriftCheck,
   mkTerraformBridgeSchema,
   langArgNames,
   withSdks,
@@ -163,7 +164,12 @@ let
   # source. It defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass `src` to
   # build from a local checkout or a different fetcher, in which case
   # `owner`/`hash` are never forced and can be omitted.
-  args' = args // {
+  #
+  # `sdkDrift` is consumed here alone, so it is stripped before `args'` rather
+  # than at each forwarding site.
+  sdkDrift = args.sdkDrift or { };
+
+  args' = removeAttrs args [ "sdkDrift" ] // {
     rev = args.rev or "v${args.version}";
     fetchSubmodules = args.fetchSubmodules or false;
     extraLdflags = args.extraLdflags or [ ];
@@ -246,10 +252,30 @@ let
     // (removeAttrs base' [ "pythonArgs" ])
   );
 
+  # tfgen emits every language itself, offline, from the same `provider/` module
+  # this build already compiles, so a drift check per language costs one more
+  # run of `pulumi-gen` rather than another toolchain. Opt-in via
+  # `sdkDrift.languages`: not every provider repo commits an `sdk/` tree, and a
+  # check that cannot find one should not be the default.
+  sdkDriftChecks = lib.genAttrs (sdkDrift.languages or [ ]) (
+    lang:
+    mkSdkDriftCheck (
+      {
+        inherit lang src;
+        inherit (base') version meta cmdGen;
+
+        pname = base'.repo;
+        pulumiGen = pulumi-gen;
+      }
+      // removeAttrs sdkDrift [ "languages" ]
+    )
+  );
+
   withSdksResult = withSdks (args' // { inherit base; });
 in
 withSdksResult.overrideAttrs (old: {
   passthru = old.passthru // {
+    inherit sdkDriftChecks;
     schema = mkTerraformBridgeSchema args';
   };
 })

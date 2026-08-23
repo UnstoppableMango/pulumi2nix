@@ -8,7 +8,8 @@
 # Each declaration becomes `packages.<name>`, and its `passthru.schema` /
 # `passthru.sdks.<lang>` are flattened out into `packages.<name>-schema` and
 # `packages.<name>-sdk-<lang>`. Everything is mirrored into `checks`, which is
-# what puts generated SDKs under `nix flake check` for the first time.
+# what puts generated SDKs under `nix flake check` for the first time, alongside
+# the check-only `checks.<name>-sdk-<lang>-generated` SDK drift checks.
 {
   lib,
   flake-parts-lib,
@@ -58,6 +59,9 @@ let
     }
     // lib.optionalAttrs (base ? schemaArgs) {
       schemaArgs = cleanArgs base.schemaArgs;
+    }
+    // lib.optionalAttrs (base ? sdkDrift) {
+      sdkDrift = stripNull (stripModule base.sdkDrift);
     };
 in
 {
@@ -105,6 +109,15 @@ in
         lib.concatMapAttrs (
           lang: sdk: lib.optionalAttrs (exposeSdk d lang flag fallback) { "${d.name}-sdk-${lang}" = sdk; }
         ) (d.drv.passthru.sdks or { });
+
+      # Drift checks never become packages: an empty marker file is not
+      # something anyone wants to `nix build`, and the whole point is that
+      # `nix flake check` notices a stale SDK.
+      driftChecksOf =
+        d:
+        lib.concatMapAttrs (lang: check: { "${d.name}-sdk-${lang}-generated" = check; }) (
+          d.drv.passthru.sdkDriftChecks or { }
+        );
 
       # Two declarations can collide either directly (same name in two trees) or
       # through flattening: a standalone `mkTerraformBridgeSchema` named
@@ -183,7 +196,9 @@ in
 
         packages = mergeUnique "packages" (map (outputsFor "exposePackage" cfg.exposeSdks) declarations);
 
-        checks = mergeUnique "checks" (map (outputsFor "exposeCheck" cfg.exposeSdkChecks) declarations);
+        checks = mergeUnique "checks" (
+          map (d: outputsFor "exposeCheck" cfg.exposeSdkChecks d // driftChecksOf d) declarations
+        );
       };
     }
   );
