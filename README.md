@@ -274,6 +274,11 @@ mkTerraformBridgeProvider rec {
 }
 ```
 
+Both this builder and `mkPulumiPackage` (which delegates to it) always build the repo's checked-in `sdk/python` tree.
+Its distribution name defaults to `pulumi-` plus `cmdRes` with the `pulumi-resource-` prefix stripped, so `cmdRes = "pulumi-resource-random"` gives `pulumi-random`, matching the name tfgen writes into the generated SDK regardless of what the repo is called.
+`pythonImportsCheck` is derived from that name by replacing `-` with `_`.
+Pass `pythonArgs.pname` and `pythonArgs.pythonImportsCheck` (`sdks.python.*` in the flake module) for an SDK that does not follow the convention.
+
 ### `mkDynamicBridgeProvider`
 
 Builds the generic `pulumi-resource-terraform-provider` binary, which dynamically bridges any Terraform provider at runtime rather than being generated ahead-of-time for one specific upstream provider like `mkTerraformBridgeProvider`.
