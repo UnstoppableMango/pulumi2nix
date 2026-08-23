@@ -1,11 +1,11 @@
 {
+  lib,
   mkTerraformBridgeProvider,
   mkPulumiSchema,
 }:
 args:
-assert
-  (args ? postConfigure)
-  || throw ''
+lib.throwIfNot (args ? postConfigure)
+  ''
     mkPulumiPackage: `postConfigure` must be supplied. mkPulumiPackage wraps
     nixpkgs' terraform-bridge provider builder, whose built-in postConfigure
     default assumes the tfgen convention (`$cmdGen schema; go generate
@@ -14,10 +14,12 @@ assert
     "schema" subcommand) - relying on the default silently runs the wrong
     schema-gen command instead of failing. Pass your own postConfigure (see
     examples/pulumi-command/default.nix).
-  '';
-(mkTerraformBridgeProvider args).overrideAttrs (old: {
-  # Overrides the terraform-bridge schema convention with the native gen-tool one.
-  passthru = old.passthru // {
-    schema = mkPulumiSchema args;
-  };
-})
+  ''
+  (
+    (mkTerraformBridgeProvider args).overrideAttrs (old: {
+      # Overrides the terraform-bridge schema convention with the native gen-tool one.
+      passthru = old.passthru // {
+        schema = mkPulumiSchema args;
+      };
+    })
+  )

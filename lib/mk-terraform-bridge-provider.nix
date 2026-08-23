@@ -1,6 +1,6 @@
 {
   buildGoModule,
-  fetchFromGitHub,
+  fetchProviderSource,
   python3Packages,
   mkTerraformBridgeSchema,
   langArgNames,
@@ -12,13 +12,9 @@ let
   # recipe instead of reaching into a nixpkgs checkout at eval time.
   mkBasePackage =
     {
-      pname,
       src,
-      version,
-      vendorHash,
       cmd,
       extraLdflags,
-      env,
       ...
     }@args:
     buildGoModule (
@@ -114,7 +110,7 @@ let
       )
     ) { };
 in
-args@{ ... }:
+args:
 let
   # Upstream mk-pulumi-package.nix has no defaults for rev/extraLdflags/env/
   # meta/fetchSubmodules, so normalize them here before forwarding.
@@ -126,31 +122,15 @@ let
   # build from a local checkout or a different fetcher, in which case
   # `owner`/`hash` are never forced and can be omitted.
   args' = args // {
-    rev = rev';
+    rev = args.rev or "v${args.version}";
+    fetchSubmodules = args.fetchSubmodules or false;
     extraLdflags = args.extraLdflags or [ ];
     env = args.env or { };
     meta = args.meta or { };
-    fetchSubmodules = fetchSubmodules';
-    src = args.src or fetchedSrc;
-  };
-  rev' = args.rev or "v${args.version}";
-  fetchSubmodules' = args.fetchSubmodules or false;
-
-  fetchedSrc = fetchFromGitHub {
-    name = "source-${args.repo}-${rev'}";
-    owner =
-      args.owner
-        or (throw "mk-terraform-bridge-provider.nix: `owner` is required unless `src` is supplied");
-    hash =
-      args.hash
-        or (throw "mk-terraform-bridge-provider.nix: `hash` is required unless `src` is supplied");
-    inherit (args) repo;
-    rev = rev';
-    fetchSubmodules = fetchSubmodules';
+    src = args.src or (fetchProviderSource "mk-terraform-bridge-provider.nix" args);
   };
 
-  argNames = langArgNames args';
-  base' = removeAttrs args' argNames;
+  base' = removeAttrs args' (langArgNames args');
 
   inherit (base') src;
 

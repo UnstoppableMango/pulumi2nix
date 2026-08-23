@@ -2,10 +2,10 @@
 # generated on demand from a schema.json via mkGeneratedSdk (component
 # providers) instead of fetched from an upstream repo. Each `<lang>Args`
 # block carries a `languagePlugin` consumed here, stripped before forwarding
-# the rest to `sdkBuilders.${lang}`.
+# the rest to that language's registered SDK builder.
 {
   lib,
-  sdkBuilders,
+  mkSdk,
   mkGeneratedSdk,
   mkGeneratedGoSdk,
   langArgNames,
@@ -18,14 +18,6 @@
   meta ? { },
   ...
 }@args:
-assert
-  !(args ? pythonArgs)
-  || throw ''
-    withGeneratedSdks: `pythonArgs` isn't supported for source-based component
-    providers. Unlike mkPulumiPackage/mkTerraformBridgeProvider, there's no
-    upstream mkPythonPackage to delegate to here - only the languages
-    registered in lib/sdks (nodejs, yarnNodejs, go, dotnet) are available.
-  '';
 let
   argNames = langArgNames args;
 
@@ -72,13 +64,6 @@ let
     else
       generated;
 
-  mkSdk =
-    lang: langArgs:
-    (sdkBuilders.${lang}
-      or (throw "lib/with-generated-sdks.nix: no SDK builder registered for language '${lang}' (available: ${lib.concatStringsSep ", " (builtins.attrNames sdkBuilders)})")
-    )
-      langArgs;
-
   extraSdks = lib.listToAttrs (
     map (
       argName:
@@ -88,7 +73,7 @@ let
       in
       {
         name = lang;
-        value = mkSdk lang (
+        value = mkSdk "lib/with-generated-sdks.nix" lang (
           {
             inherit pname meta version;
             src = mkSrc lang langArgs;
@@ -99,22 +84,31 @@ let
     ) argNames
   );
 in
-lib.throwIf (missingGoArgs != [ ])
+lib.throwIf (args ? pythonArgs)
   ''
-    withGeneratedSdks: `goArgs` is missing ${lib.concatStringsSep ", " missingGoArgs}.
-    `pulumi package gen-sdk --language go` emits only .go sources, so a generated go
-    SDK additionally needs `importBasePath` (the schema's `language.go.importBasePath`,
-    without which codegen writes self-imports that don't match the directories it just
-    created) plus a `go.mod`/`go.sum` pair, the same way `nodejsArgs` needs a
-    `package-lock.json`. See the README for how to regenerate them.
+    withGeneratedSdks: `pythonArgs` isn't supported for source-based component
+    providers. Unlike mkPulumiPackage/mkTerraformBridgeProvider, there's no
+    upstream mkPythonPackage to delegate to here - only the languages
+    registered in lib/sdks (nodejs, yarnNodejs, go, dotnet) are available.
   ''
   (
-    if extraSdks == { } then
-      base
-    else
-      base.overrideAttrs (old: {
-        passthru = (old.passthru or { }) // {
-          sdks = (old.passthru.sdks or { }) // extraSdks;
-        };
-      })
+    lib.throwIf (missingGoArgs != [ ])
+      ''
+        withGeneratedSdks: `goArgs` is missing ${lib.concatStringsSep ", " missingGoArgs}.
+        `pulumi package gen-sdk --language go` emits only .go sources, so a generated go
+        SDK additionally needs `importBasePath` (the schema's `language.go.importBasePath`,
+        without which codegen writes self-imports that don't match the directories it just
+        created) plus a `go.mod`/`go.sum` pair, the same way `nodejsArgs` needs a
+        `package-lock.json`. See the README for how to regenerate them.
+      ''
+      (
+        if extraSdks == { } then
+          base
+        else
+          base.overrideAttrs (old: {
+            passthru = (old.passthru or { }) // {
+              sdks = (old.passthru.sdks or { }) // extraSdks;
+            };
+          })
+      )
   )

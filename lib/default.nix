@@ -24,9 +24,17 @@ let
     # so `sourceRoot` works for caller-supplied sources as well as fetcher output.
     srcName = callPackage ./src-name.nix { };
 
+    # The default `owner`/`repo`/`rev`/`hash` fetch every repo-based builder
+    # falls back to when the caller supplies no `src`.
+    fetchProviderSource = callPackage ./fetch-provider-source.nix { };
+
     # Registry of per-language SDK builders (lang name -> builder function).
     # Given the augmented callPackage so the builders can reach `srcName`.
     sdkBuilders = callPackage ./sdks { inherit callPackage; };
+
+    # Applies one of those builders by language name, with a readable error for
+    # a language that isn't registered.
+    mkSdk = callPackage ./mk-sdk.nix { };
 
     # Attaches `<lang>Args`-driven SDK builds to any base derivation's `passthru.sdks`.
     withSdks = callPackage ./with-sdks.nix { };

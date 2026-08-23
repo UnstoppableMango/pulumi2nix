@@ -1,7 +1,7 @@
 {
   stdenv,
   buildGoModule,
-  fetchFromGitHub,
+  fetchProviderSource,
   srcName,
 }:
 # Builds only a provider's generated `schema.json`, skipping the resource
@@ -10,35 +10,23 @@
 # one supplied by mkTerraformBridgeSchema or mkPulumiSchema rather than
 # calling this directly.
 #
-# `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build
-# from a local checkout or a different fetcher. `owner`/`hash` are only forced
-# by that default, so a caller supplying `src` can omit them. `repo`/`rev` are
-# used for naming either way.
+# `src` defaults to fetchProviderSource's fetch of `owner`/`repo`/`rev`/`hash`
+# (`rev` defaulting to `v${version}`); pass `src` to build from a local checkout
+# or a different fetcher. Those three reach the fetch through `args` rather than
+# as formals, since they are only forced by that default and a caller supplying
+# `src` can omit them. `repo` is a formal either way: it also names the output.
 {
-  owner ? throw "mk-schema.nix: `owner` is required unless `src` is supplied",
   repo,
-  rev ? "v${version}",
   version,
-  hash ? throw "mk-schema.nix: `hash` is required unless `src` is supplied",
-  src ? fetchFromGitHub {
-    name = "source-${repo}-${rev}";
-    inherit
-      owner
-      repo
-      rev
-      hash
-      fetchSubmodules
-      ;
-  },
+  src ? fetchProviderSource "mk-schema.nix" args,
   vendorHash,
   cmdGen,
   schemaCommand,
   extraLdflags ? [ ],
   env ? { },
-  fetchSubmodules ? false,
   meta ? { },
   ...
-}:
+}@args:
 let
   pulumi-gen = buildGoModule {
     pname = cmdGen;

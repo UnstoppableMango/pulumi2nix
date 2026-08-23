@@ -12,7 +12,7 @@
 # dynamic/Makefile.
 {
   buildGoModule,
-  fetchFromGitHub,
+  fetchProviderSource,
 }:
 # `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build from
 # a local checkout or a different fetcher. `hash` is only forced by that default,
@@ -24,8 +24,10 @@
   rev ? "v${version}",
   version,
   hash ? throw "mk-dynamic-bridge-provider.nix: `hash` is required unless `src` is supplied",
-  src ? fetchFromGitHub {
-    name = "source-${repo}-${rev}";
+  # Passed explicitly rather than as `args`: this builder defaults `owner`/`repo`
+  # in its own formals, which another formal's default expression can see but
+  # the `@args` binding cannot.
+  src ? fetchProviderSource "mk-dynamic-bridge-provider.nix" {
     inherit
       owner
       repo

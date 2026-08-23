@@ -25,12 +25,19 @@
         ./modules/flake-module.nix
       ];
 
-      flake.lib = import ./lib;
-      flake.overlays.default = import ./lib/overlay.nix;
-      flake.flakeModules.default = ./modules/flake-module.nix;
+      flake = {
+        lib = import ./lib;
+        overlays.default = import ./lib/overlay.nix;
+        flakeModules.default = ./modules/flake-module.nix;
+      };
 
       perSystem =
-        { config, pkgs, ... }:
+        {
+          config,
+          lib,
+          pkgs,
+          ...
+        }:
         let
           overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);
           tools = {
@@ -50,12 +57,35 @@
             default = pkgs.linkFarm "pulumi2nix-examples" config.pulumi.packages;
           };
 
-          checks = tools;
+          checks = tools // {
+            # Filtered to .nix files so an unrelated README edit doesn't rebuild it.
+            nix-lint =
+              let
+                nixFiles = lib.fileset.toSource {
+                  root = ./.;
+                  fileset = lib.fileset.fileFilter (file: file.hasExt "nix") ./.;
+                };
+              in
+              pkgs.runCommandLocal "nix-lint"
+                {
+                  nativeBuildInputs = with pkgs; [
+                    statix
+                    deadnix
+                  ];
+                }
+                ''
+                  statix check ${nixFiles}
+                  deadnix --fail ${nixFiles}
+                  touch $out
+                '';
+          };
 
           devShells.default = pkgs.mkShellNoCC {
             packages = with pkgs; [
+              deadnix
               gnumake
               nixfmt
+              statix
             ];
           };
 
