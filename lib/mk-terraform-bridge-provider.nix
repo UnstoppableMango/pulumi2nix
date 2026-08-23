@@ -8,6 +8,30 @@
   srcName,
 }:
 let
+  # Args this file consumes itself: the source-fetch inputs, the two `cmd/`
+  # binary names, the ldflag list, and the flake module's SDK grouping key.
+  # Each has already been read into `src`, `sourceRoot`, `subPackages` or
+  # `ldflags` by the time the caller's attrset is forwarded, so letting them
+  # through would only plant inert environment variables in the derivation.
+  # That is not harmless: it forks the tfgen build in two (mk-schema.nix
+  # builds the byte-identical binary from named formals, so its `pulumi-gen`
+  # and the one below would otherwise differ only by these vars), and it makes
+  # any change to them - documenting `owner`/`rev` alongside an explicit
+  # `src`, respelling `cmdGen` - invalidate the provider and everything
+  # downstream of it for no reason.
+  controlArgs = [
+    "cmd"
+    "cmdGen"
+    "cmdRes"
+    "repo"
+    "owner"
+    "rev"
+    "hash"
+    "fetchSubmodules"
+    "extraLdflags"
+    "sdks"
+  ];
+
   # Ported from nixpkgs' mk-pulumi-package.nix so this repo owns the build
   # recipe instead of reaching into a nixpkgs checkout at eval time.
   mkBasePackage =
@@ -31,7 +55,7 @@ let
         ]
         ++ extraLdflags;
       }
-      // args
+      // removeAttrs args controlArgs
     );
 
   mkPythonPackage =
@@ -106,7 +130,7 @@ let
             (builtins.replaceStrings [ "-" ] [ "_" ] pname)
           ];
         }
-        // args
+        // removeAttrs args controlArgs
       )
     ) { };
 in
@@ -180,6 +204,9 @@ let
         // (base'.pythonArgs or { })
       );
     }
+    # `controlArgs` are stripped by mkBasePackage, which sees this whole merged
+    # attrset; only `pythonArgs` has to go before the merge, so a caller's block
+    # can't shadow the `passthru.sdks.python` already built from it.
     // (removeAttrs base' [ "pythonArgs" ])
   );
 
