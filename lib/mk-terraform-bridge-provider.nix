@@ -7,6 +7,7 @@
   langArgNames,
   withSdks,
   srcName,
+  narrowSdkSrc,
 }:
 let
   # Args this file consumes itself: the source-fetch inputs, the two `cmd/`
@@ -175,6 +176,8 @@ let
 
   inherit (base') src;
 
+  pythonArgs = base'.pythonArgs or { };
+
   pulumi-gen = mkBasePackage {
     inherit (base')
       version
@@ -211,32 +214,31 @@ let
         VERSION=v${base'.version} go generate cmd/${base'.cmdRes}/main.go
       '';
 
-      passthru.sdks.python =
-        let
-          pythonArgs = base'.pythonArgs or { };
-        in
-        mkPythonPackage (
-          {
-            inherit (base') meta version;
-            inherit src;
+      passthru.sdks.python = mkPythonPackage (
+        {
+          inherit (base') meta version;
 
-            # Lang-qualified for the same reason as withSdks' layered SDKs: an
-            # unqualified `repo` makes the provider and its SDKs indistinguishable
-            # in store paths and build logs. Only `python3Packages`' interpreter
-            # prefix kept this one apart before.
-            pname = "${base'.repo}-sdk-python";
+          # Only `sdk/python` of the shared tree, the same narrowing withSdks
+          # applies to the other languages. See lib/narrow-sdk-src.nix.
+          src = narrowSdkSrc.narrow "python" src pythonArgs;
 
-            # tfgen names the python distribution after the *Pulumi package*, not
-            # the repo: `pulumi-resource-git` ships `sdk/python` as `pulumi_git`,
-            # whatever the repo is called. Deriving this from `repo` only happens
-            # to work for repos named `pulumi-<name>`, and gets both the
-            # `pip show` check and the derived `pythonImportsCheck` wrong for
-            # everything else. `sdks.python.pname` stays the escape hatch, since
-            # `pythonArgs` is merged last and steers both names.
-            distName = pythonArgs.pname or ("pulumi-" + lib.removePrefix "pulumi-resource-" base'.cmdRes);
-          }
-          // pythonArgs
-        );
+          # Lang-qualified for the same reason as withSdks' layered SDKs: an
+          # unqualified `repo` makes the provider and its SDKs indistinguishable
+          # in store paths and build logs. Only `python3Packages`' interpreter
+          # prefix kept this one apart before.
+          pname = "${base'.repo}-sdk-python";
+
+          # tfgen names the python distribution after the *Pulumi package*, not
+          # the repo: `pulumi-resource-git` ships `sdk/python` as `pulumi_git`,
+          # whatever the repo is called. Deriving this from `repo` only happens
+          # to work for repos named `pulumi-<name>`, and gets both the
+          # `pip show` check and the derived `pythonImportsCheck` wrong for
+          # everything else. `sdks.python.pname` stays the escape hatch, since
+          # `pythonArgs` is merged last and steers both names.
+          distName = pythonArgs.pname or ("pulumi-" + lib.removePrefix "pulumi-resource-" base'.cmdRes);
+        }
+        // removeAttrs pythonArgs narrowSdkSrc.optionNames
+      );
     }
     # `controlArgs` are stripped by mkBasePackage, which sees this whole merged
     # attrset; only `pythonArgs` has to go before the merge, so a caller's block

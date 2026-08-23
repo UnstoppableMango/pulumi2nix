@@ -33,6 +33,34 @@ let
     };
   };
 
+  # Control over lib/narrow-sdk-src.nix, which hands each checked-in SDK only
+  # the part of the shared provider tree it builds from. `null` keeps the
+  # builder's own default; both are dropped by `toLangArgs` when left unset.
+  # Not offered for generated SDKs: their source is codegen output, already
+  # scoped to the one language.
+  narrowing = {
+    narrowSrc = mkOption {
+      type = types.nullOr types.bool;
+      default = null;
+      description = ''
+        Narrow this SDK's `src` to the subtree it builds from (default: true),
+        so an unrelated file change no longer rebuilds it. Set to `false` for a
+        repo whose SDK build reads files elsewhere in the tree. Already a no-op
+        when `src` is an unbuilt derivation, such as the default fetch.
+      '';
+    };
+
+    srcPaths = mkOption {
+      type = types.nullOr (types.listOf types.str);
+      default = null;
+      description = ''
+        Repo-relative paths making up this SDK's narrowed `src`, replacing the
+        per-language default (e.g. `sdk/nodejs`, `README.md`, `LICENSE` for
+        nodejs). Paths that do not exist are skipped rather than failing.
+      '';
+    };
+  };
+
   sdk =
     options:
     types.nullOr (
@@ -41,6 +69,10 @@ let
         options = exposure // options;
       }
     );
+
+  # Checked-in SDKs build from the provider repo's own tree, so they are the
+  # ones `narrowing` applies to.
+  checkedInSdk = options: sdk (narrowing // options);
 
   # `pulumi package gen-sdk` needs the target language's own host binary.
   languagePlugin = required types.package ''
@@ -69,13 +101,13 @@ rec {
   checkedIn = types.submodule {
     options = {
       nodejs = mkOption {
-        type = sdk nodejsCommon;
+        type = checkedInSdk nodejsCommon;
         default = null;
         description = "Build the repo's `sdk/nodejs` with npm.";
       };
 
       yarnNodejs = mkOption {
-        type = sdk yarnCommon;
+        type = checkedInSdk yarnCommon;
         default = null;
         description = ''
           Build the repo's `sdk/nodejs` with yarn classic instead of npm, for
@@ -84,19 +116,19 @@ rec {
       };
 
       go = mkOption {
-        type = sdk { vendorHash = required types.str "Vendor hash for the SDK module."; };
+        type = checkedInSdk { vendorHash = required types.str "Vendor hash for the SDK module."; };
         default = null;
         description = "Build the repo's `sdk/go` module.";
       };
 
       dotnet = mkOption {
-        type = sdk dotnetCommon;
+        type = checkedInSdk dotnetCommon;
         default = null;
         description = "Pack the repo's `sdk/dotnet` project as a .nupkg.";
       };
 
       python = mkOption {
-        type = sdk { };
+        type = checkedInSdk { };
         default = null;
         description = ''
           Extra arguments for the python SDK. Unlike the other languages this

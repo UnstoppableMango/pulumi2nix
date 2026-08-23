@@ -3,6 +3,7 @@
   fetchProviderSource,
   mkSdk,
   langArgNames,
+  narrowSdkSrc,
 }:
 {
   base,
@@ -23,6 +24,7 @@ let
       argName:
       let
         lang = lib.removeSuffix "Args" argName;
+        langArgs = args.${argName};
       in
       {
         name = lang;
@@ -30,8 +32,6 @@ let
           {
             inherit (args) version;
             meta = args.meta or { };
-            inherit src;
-
             # Lang-qualified so the provider and each of its SDKs get distinct
             # derivation names. An unqualified `repo` makes every store path,
             # build log line and `nix flake check` entry read the same. This
@@ -39,8 +39,13 @@ let
             # flake module already produces. A per-SDK `pname` still wins,
             # since `args.${argName}` merges last.
             pname = "${args.repo}-sdk-${lang}";
+
+            # Each SDK gets only the part of the shared tree it builds from, so
+            # editing a file no SDK reads stops rebuilding all of them. See
+            # lib/narrow-sdk-src.nix for what that covers and how to opt out.
+            src = narrowSdkSrc.narrow lang src langArgs;
           }
-          // args.${argName}
+          // removeAttrs langArgs narrowSdkSrc.optionNames
         );
       }
     ) argNames
