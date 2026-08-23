@@ -1,5 +1,6 @@
 {
   lib,
+  attachSdks,
   fetchProviderSource,
   mkSdk,
   langArgNames,
@@ -51,11 +52,4 @@ let
     ) argNames
   );
 in
-if extraSdks == { } then
-  base
-else
-  base.overrideAttrs (old: {
-    passthru = (old.passthru or { }) // {
-      sdks = (old.passthru.sdks or { }) // extraSdks;
-    };
-  })
+attachSdks base extraSdks

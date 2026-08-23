@@ -9,10 +9,14 @@
 { lib }:
 let
   inherit (lib) mkOption types;
-
+in
+rec {
   # Optional args are `null` by default and stripped before reaching a builder.
   # The builders test presence with `args.owner or (throw ...)`, so a literal
   # `owner = null` would satisfy `?` and slip a null into fetchFromGitHub.
+  #
+  # Exported alongside the fragments so modules/sdks.nix shares one definition
+  # rather than restating them.
   optional =
     type: description:
     mkOption {
@@ -26,8 +30,7 @@ let
     mkOption {
       inherit type description;
     };
-in
-rec {
+
   # Carried by every builder.
   common = {
     version = required types.str ''

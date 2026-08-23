@@ -20,12 +20,23 @@
   pname,
   version,
   meta ? { },
-  sourceRoot ? null,
   # List of { name, version, plugin }, seeded into the plugin cache before get-schema runs.
   providerPlugins ? [ ],
   ...
 }@args:
 let
+  # `sourceRoot` is not a formal: it is forwarded verbatim like every other
+  # unrecognised arg, and read back out of `rest` for the one place that needs
+  # it separately (the npm dep fetch, which unpacks the same tree).
+  rest = removeAttrs args [
+    "lockFile"
+    "npmDepsHash"
+    "languagePlugin"
+    "providerPlugins"
+  ];
+
+  sourceRootArg = lib.optionalAttrs (rest ? sourceRoot) { inherit (rest) sourceRoot; };
+
   postPatch = ''
     cp ${lockFile} package-lock.json
     chmod +w package-lock.json
@@ -51,7 +62,7 @@ stdenv.mkDerivation (
         inherit src postPatch;
         hash = npmDepsHash;
       }
-      // lib.optionalAttrs (sourceRoot != null) { inherit sourceRoot; }
+      // sourceRootArg
     );
 
     nativeBuildInputs = [
@@ -83,12 +94,5 @@ stdenv.mkDerivation (
       runHook postInstall
     '';
   }
-  // lib.optionalAttrs (sourceRoot != null) { inherit sourceRoot; }
-  // (lib.removeAttrs args [
-    "lockFile"
-    "npmDepsHash"
-    "languagePlugin"
-    "sourceRoot"
-    "providerPlugins"
-  ])
+  // rest
 )

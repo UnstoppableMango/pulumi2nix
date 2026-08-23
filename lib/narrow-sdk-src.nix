@@ -18,7 +18,9 @@ let
   # `sourceRoot` points at; `extra` are the files the build reaches for outside
   # it - lib/sdks/npm.nix copies `../../README.md ../../LICENSE` in `postBuild`,
   # and a Pulumi go SDK's module root is `sdk/go.mod`, one level above `sdk/go`.
-  defaults = {
+  # `extra` is optional; a language that reads nothing outside its own `dir`
+  # omits it.
+  defaults = rec {
     nodejs = {
       dir = "sdk/nodejs";
       extra = [
@@ -27,13 +29,8 @@ let
       ];
     };
 
-    yarnNodejs = {
-      dir = "sdk/nodejs";
-      extra = [
-        "README.md"
-        "LICENSE"
-      ];
-    };
+    # Same tree as nodejs, built by a different tool.
+    yarnNodejs = nodejs;
 
     go = {
       dir = "sdk/go";
@@ -43,15 +40,9 @@ let
       ];
     };
 
-    dotnet = {
-      dir = "sdk/dotnet";
-      extra = [ ];
-    };
+    dotnet.dir = "sdk/dotnet";
 
-    python = {
-      dir = "sdk/python";
-      extra = [ ];
-    };
+    python.dir = "sdk/python";
   };
 in
 {
@@ -70,7 +61,7 @@ in
     let
       spec = defaults.${lang} or null;
 
-      paths = langArgs.srcPaths or (if spec == null then null else [ spec.dir ] ++ spec.extra);
+      paths = langArgs.srcPaths or (if spec == null then null else [ spec.dir ] ++ (spec.extra or [ ]));
 
       root =
         if builtins.isPath src then

@@ -10,7 +10,7 @@
 let
   inherit (lib) mkOption types;
 
-  required = type: description: mkOption { inherit type description; };
+  inherit (import ./fragments.nix { inherit lib; }) required;
 
   # Per-SDK output controls. Consumed by flake-module.nix and stripped before
   # the remaining args reach a builder. `null` means "inherit the tree-wide

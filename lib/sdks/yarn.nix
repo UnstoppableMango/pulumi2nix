@@ -51,7 +51,7 @@ stdenv.mkDerivation (
     '';
   }
   // lib.optionalAttrs (!(args ? yarnBuildScript)) { dontYarnBuild = true; }
-  // (lib.removeAttrs args [
+  // (removeAttrs args [
     "yarnLockFile"
     "yarnDepsHash"
   ])

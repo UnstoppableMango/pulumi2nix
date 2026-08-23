@@ -1,5 +1,4 @@
 {
-  lib,
   buildNpmPackage,
   srcName,
 }:
@@ -56,5 +55,5 @@ buildNpmPackage (
       runHook postInstall
     '';
   }
-  // (lib.removeAttrs args [ "lockFile" ])
+  // (removeAttrs args [ "lockFile" ])
 )

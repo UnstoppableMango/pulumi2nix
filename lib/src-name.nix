@@ -13,22 +13,19 @@ src.name or (
     path = toString src;
     base = baseNameOf path;
   in
-  # The two cases differ in how many hashes end up in front of the name.
+  # What separates the two cases is whether the value is *already* the build
+  # input or gets copied to become one.
   #
-  # A path value is *copied* into the store to become a build input, under a
-  # name Nix derives from its own basename, so the store adds one hash on top of
+  # A store-path string is already a store path, so it is used directly: no
+  # copy, and the one hash it carries is the one stripHash removes.
+  #
+  # Everything else - a path value, in or out of the store - is copied in under
+  # a name Nix derives from its basename, so the store adds a hash on top of
   # whatever that basename already was. stripHash peels off exactly that one,
-  # leaving the basename whole. For a path that already lives in the store the
-  # basename is itself `<hash>-<name>`, and stripping a second time would name a
-  # directory unpackPhase never created - the mismatch that made `sourceRoot`
-  # point at nothing.
-  #
-  # A store-path string, by contrast, is already a store path and is used as the
-  # input directly, no copy and no second hash, so its one hash is the one
-  # stripHash removes.
-  if builtins.isPath src then
-    base
-  else if lib.hasPrefix builtins.storeDir path then
+  # leaving the basename whole. Stripping a second time off a path that already
+  # lives in the store would name a directory unpackPhase never created, which
+  # is the mismatch that made `sourceRoot` point at nothing.
+  if !builtins.isPath src && lib.hasPrefix builtins.storeDir path then
     builtins.substring 33 (-1) base
   else
     base
