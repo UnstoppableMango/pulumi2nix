@@ -66,6 +66,14 @@ let
       version,
       ...
     }@args:
+    let
+      # The derivation `pname` is lang-qualified so the provider and its SDKs
+      # don't all land in the store under the same name. The Python
+      # *distribution* name is a separate thing: it's what tfgen writes into
+      # pyproject.toml, what pip installs, and what gets imported, so the checks
+      # below key off `distName` rather than the derivation name.
+      distName = args.distName or pname;
+    in
     python3Packages.callPackage (
       {
         buildPythonPackage,
@@ -120,17 +128,25 @@ let
           checkPhase = ''
             runHook preCheck
 
-            ${pip}/bin/pip show "${pname}" | grep "Version: ${version}" > /dev/null \
+            ${pip}/bin/pip show "${distName}" | grep "Version: ${version}" > /dev/null \
               || (echo "ERROR: Version substitution seems to be broken"; exit 1)
 
             runHook postCheck
           '';
 
           pythonImportsCheck = [
-            (builtins.replaceStrings [ "-" ] [ "_" ] pname)
+            (builtins.replaceStrings [ "-" ] [ "_" ] distName)
           ];
+
+          # nixpkgs' pythonMetadataCheckPhase looks the installed distribution up
+          # by the derivation `pname`, so a lang-qualified `pname` makes it fail
+          # with `PackageNotFoundError` rather than a version mismatch. It only
+          # compares .dist-info's version against `version`, which the `pip show`
+          # check above already does against `distName`, so drop it rather than
+          # give up the qualified name.
+          dontCheckPythonMetadata = distName != pname;
         }
-        // removeAttrs args controlArgs
+        // removeAttrs args (controlArgs ++ [ "distName" ])
       )
     ) { };
 in
@@ -194,15 +210,29 @@ let
         VERSION=v${base'.version} go generate cmd/${base'.cmdRes}/main.go
       '';
 
-      passthru.sdks.python = mkPythonPackage (
-        {
-          inherit (base') meta version;
-          inherit src;
+      passthru.sdks.python =
+        let
+          pythonArgs = base'.pythonArgs or { };
+        in
+        mkPythonPackage (
+          {
+            inherit (base') meta version;
+            inherit src;
 
-          pname = base'.repo;
-        }
-        // (base'.pythonArgs or { })
-      );
+            # Lang-qualified for the same reason as withSdks' layered SDKs: an
+            # unqualified `repo` makes the provider and its SDKs indistinguishable
+            # in store paths and build logs. Only `python3Packages`' interpreter
+            # prefix kept this one apart before.
+            pname = "${base'.repo}-sdk-python";
+
+            # The distribution name keeps its old value, so `pip show` and
+            # `pythonImportsCheck` behave exactly as before. A caller overriding
+            # `sdks.python.pname` (the documented workaround for a distribution
+            # that isn't named after the repo) still steers both.
+            distName = pythonArgs.pname or base'.repo;
+          }
+          // pythonArgs
+        );
     }
     # `controlArgs` are stripped by mkBasePackage, which sees this whole merged
     # attrset; only `pythonArgs` has to go before the merge, so a caller's block

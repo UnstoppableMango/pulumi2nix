@@ -31,7 +31,14 @@ let
             inherit (args) version;
             meta = args.meta or { };
             inherit src;
-            pname = args.repo;
+
+            # Lang-qualified so the provider and each of its SDKs get distinct
+            # derivation names. An unqualified `repo` makes every store path,
+            # build log line and `nix flake check` entry read the same. This
+            # matches the flattened `packages.<name>-sdk-<lang>` output the
+            # flake module already produces. A per-SDK `pname` still wins,
+            # since `args.${argName}` merges last.
+            pname = "${args.repo}-sdk-${lang}";
           }
           // args.${argName}
         );

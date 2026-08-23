@@ -150,6 +150,8 @@ mkTerraformBridgeProvider {
 
 `owner` and `hash` are only forced by the default fetch, so a caller supplying `src` can omit them.
 `repo` is required either way, and `rev` defaults to `v${version}`: both name the derivation, and `mkDynamicBridgeProvider` compiles `rev` into its version ldflag.
+Layered SDKs take a lang-qualified derivation name, `<repo>-sdk-<lang>`, matching the flattened `packages.<name>-sdk-<lang>` output, so a provider and its SDKs stay distinguishable in store paths and build logs.
+Set `pname` on the individual `sdks.<lang>` block (or `<lang>Args`) to override it.
 
 `sourceRoot` is resolved from the `src`'s name, so any fetcher output, a `lib.cleanSourceWith`, a plain path, and a store path all work.
 Note the caveat below about `src = ./.` inside a flake only seeing git-tracked files.
