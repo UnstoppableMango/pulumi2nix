@@ -58,6 +58,29 @@ Add this repo as a flake input, then obtain each builder via `callPackage` again
 Each builder below is instantiated the same way: call `lib` once with `pkgs` to get back every builder pre-applied, then apply the one you need to a provider's own arguments.
 The full, buildable source for every example is under [`examples/`](examples); what follows is the trimmed shape of each one.
 
+### Overriding the source
+
+Every builder that fetches an upstream provider (`mkSchema`, `mkPulumiSchema`, `mkTerraformBridgeSchema`, `mkPulumiPackage`, `mkTerraformBridgeProvider`, `mkDynamicBridgeProvider`, `withSdks`) accepts an optional `src`.
+It defaults to a `fetchFromGitHub` of `owner`/`repo`/`rev`/`hash`, so the examples below never set it.
+Pass `src` to build from a local checkout, a patched tree, or a different fetcher:
+
+```nix
+mkTerraformBridgeProvider {
+  repo = "pulumi-random";
+  version = "4.14.0";
+  src = ./my-checkout; # or fetchgit, fetchzip, a flake input, ...
+  vendorHash = "sha256-...";
+  cmdGen = "pulumi-tfgen-random";
+  cmdRes = "pulumi-resource-random";
+}
+```
+
+`owner` and `hash` are only forced by the default fetch, so a caller supplying `src` can omit them.
+`repo` is still required either way, and `rev` still defaults to `v${version}`: both name the derivation, and `mkDynamicBridgeProvider` compiles `rev` into its version ldflag.
+
+`sourceRoot` is resolved from the `src`'s name, so any fetcher output, a `lib.cleanSourceWith`, a plain path, and a store path all work.
+Note the caveat below about `src = ./.` inside a flake only seeing git-tracked files.
+
 ### Overlay
 
 As an alternative to threading `pkgs` through every builder call yourself, `pulumi2nix.overlays.default` applies every `lib` builder directly onto `pkgs`, pre-instantiated against it:
@@ -179,7 +202,7 @@ mkTerraformBridgeProvider rec {
 ### `mkDynamicBridgeProvider`
 
 Builds the generic `pulumi-resource-terraform-provider` binary, which dynamically bridges any Terraform provider at runtime rather than being generated ahead-of-time for one specific upstream provider like `mkTerraformBridgeProvider`.
-`owner`/`repo` default to `pulumi`/`pulumi-terraform-bridge` (where the `dynamic` package actually lives; `pulumi/pulumi-terraform-provider` only hosts releases built from it), so most callers only need to pin `version`/`hash`/`vendorHash`.
+`owner`/`repo` default to `pulumi`/`pulumi-terraform-bridge` (where the `dynamic` package actually lives; `pulumi/pulumi-terraform-provider` only hosts releases built from it), so most callers only need to pin `version`/`hash`/`vendorHash` (or `version`/`vendorHash` plus a [`src`](#overriding-the-source)).
 See [`examples/pulumi-terraform-provider`](examples/pulumi-terraform-provider).
 
 ```nix

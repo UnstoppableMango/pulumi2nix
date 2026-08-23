@@ -1,5 +1,6 @@
 {
   buildDotnetModule,
+  srcName,
 }:
 {
   meta ? { },
@@ -19,7 +20,7 @@ buildDotnetModule (
       nugetDeps
       ;
 
-    sourceRoot = "${src.name}/sdk/dotnet";
+    sourceRoot = "${srcName src}/sdk/dotnet";
 
     # Pulumi's dotnet codegen leaves exactly one .csproj per SDK with no
     # version.txt; upstream's Makefile writes it right before `dotnet build`,

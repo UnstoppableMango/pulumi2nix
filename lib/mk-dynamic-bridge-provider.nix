@@ -14,12 +14,26 @@
   buildGoModule,
   fetchFromGitHub,
 }:
+# `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build from
+# a local checkout or a different fetcher. `hash` is only forced by that default,
+# so a caller supplying `src` can omit it. `rev` still names the source and feeds
+# the version ldflag either way.
 {
   owner ? "pulumi",
   repo ? "pulumi-terraform-bridge",
   rev ? "v${version}",
   version,
-  hash,
+  hash ? throw "mk-dynamic-bridge-provider.nix: `hash` is required unless `src` is supplied",
+  src ? fetchFromGitHub {
+    name = "source-${repo}-${rev}";
+    inherit
+      owner
+      repo
+      rev
+      hash
+      fetchSubmodules
+      ;
+  },
   vendorHash,
   extraLdflags ? [ ],
   env ? { },
@@ -44,18 +58,8 @@ buildGoModule (
       vendorHash
       env
       meta
+      src
       ;
-
-    src = fetchFromGitHub {
-      name = "source-${repo}-${rev}";
-      inherit
-        owner
-        repo
-        rev
-        hash
-        fetchSubmodules
-        ;
-    };
 
     subPackages = [ "dynamic" ];
 

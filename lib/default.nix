@@ -20,8 +20,13 @@ let
     # `nodejsArgs`, `goArgs`), shared by withSdks and withGeneratedSdks.
     langArgNames = callPackage ./lang-arg-names.nix { };
 
+    # Resolves the directory name unpackPhase leaves behind for a given `src`,
+    # so `sourceRoot` works for caller-supplied sources as well as fetcher output.
+    srcName = callPackage ./src-name.nix { };
+
     # Registry of per-language SDK builders (lang name -> builder function).
-    sdkBuilders = callPackage ./sdks { };
+    # Given the augmented callPackage so the builders can reach `srcName`.
+    sdkBuilders = callPackage ./sdks { inherit callPackage; };
 
     # Attaches `<lang>Args`-driven SDK builds to any base derivation's `passthru.sdks`.
     withSdks = callPackage ./with-sdks.nix { };

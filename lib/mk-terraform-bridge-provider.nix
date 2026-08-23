@@ -5,6 +5,7 @@
   mkTerraformBridgeSchema,
   langArgNames,
   withSdks,
+  srcName,
 }:
 let
   # Ported from nixpkgs' mk-pulumi-package.nix so this repo owns the build
@@ -22,7 +23,7 @@ let
     }@args:
     buildGoModule (
       {
-        sourceRoot = "${src.name}/provider";
+        sourceRoot = "${srcName src}/provider";
 
         subPackages = [ "cmd/${cmd}" ];
 
@@ -64,7 +65,7 @@ let
             ;
           pyproject = true;
 
-          sourceRoot = "${src.name}/sdk/python";
+          sourceRoot = "${srcName src}/sdk/python";
 
           propagatedBuildInputs = [
             parver
@@ -118,26 +119,40 @@ let
   # Upstream mk-pulumi-package.nix has no defaults for rev/extraLdflags/env/
   # meta/fetchSubmodules, so normalize them here before forwarding.
   # Downstream consumers can still default them independently for standalone use.
+  #
+  # `src` is resolved here rather than at each use so the gen tool, the resource
+  # binary, the python SDK, withSdks and mkTerraformBridgeSchema all share one
+  # source. It defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass `src` to
+  # build from a local checkout or a different fetcher, in which case
+  # `owner`/`hash` are never forced and can be omitted.
   args' = args // {
-    rev = args.rev or "v${args.version}";
+    rev = rev';
     extraLdflags = args.extraLdflags or [ ];
     env = args.env or { };
     meta = args.meta or { };
-    fetchSubmodules = args.fetchSubmodules or false;
+    fetchSubmodules = fetchSubmodules';
+    src = args.src or fetchedSrc;
   };
+  rev' = args.rev or "v${args.version}";
+  fetchSubmodules' = args.fetchSubmodules or false;
+
+  fetchedSrc = fetchFromGitHub {
+    name = "source-${args.repo}-${rev'}";
+    owner =
+      args.owner
+        or (throw "mk-terraform-bridge-provider.nix: `owner` is required unless `src` is supplied");
+    hash =
+      args.hash
+        or (throw "mk-terraform-bridge-provider.nix: `hash` is required unless `src` is supplied");
+    inherit (args) repo;
+    rev = rev';
+    fetchSubmodules = fetchSubmodules';
+  };
+
   argNames = langArgNames args';
   base' = removeAttrs args' argNames;
 
-  src = fetchFromGitHub {
-    name = "source-${base'.repo}-${base'.rev}";
-    inherit (base')
-      owner
-      repo
-      rev
-      hash
-      fetchSubmodules
-      ;
-  };
+  inherit (base') src;
 
   pulumi-gen = mkBasePackage {
     inherit (base')
