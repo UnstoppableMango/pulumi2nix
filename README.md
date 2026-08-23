@@ -338,12 +338,12 @@ mkTerraformBridgeProvider rec {
 }
 ```
 
-Both this builder and `mkPulumiPackage` (which delegates to it) always build the repo's checked-in `sdk/python` tree.
+Both this builder and `mkPulumiPackage` (which delegates to it) always build a python SDK, from the repo's checked-in `sdk/python` tree unless `pythonArgs.generate` swaps that for codegen.
 Its distribution name defaults to `pulumi-` plus `cmdRes` with the `pulumi-resource-` prefix stripped, so `cmdRes = "pulumi-resource-random"` gives `pulumi-random`, matching the name tfgen writes into the generated SDK regardless of what the repo is called.
 `pythonImportsCheck` is derived from that name by replacing `-` with `_`.
 Pass `pythonArgs.pname` and `pythonArgs.pythonImportsCheck` (`sdks.python.*` in the flake module) for an SDK that does not follow the convention.
 
-It also takes an optional `sdkDrift` block, which is what [SDK drift checks](#sdk-drift-checks) below are built from.
+It also takes an optional `sdkDrift` block, which is what [SDK drift checks](#sdk-drift-checks) below are built from, and a per-language `generate` flag, which replaces the committed tree with codegen entirely - see [Generated SDKs for bridged providers](#generated-sdks-for-bridged-providers).
 
 ### SDK drift checks
 
@@ -417,6 +417,56 @@ It is off by default (`languages` starts empty), because it only makes sense whe
 - The gen tool must be able to find its documentation offline. Bridged providers that pull doc comments out of an upstream Terraform provider's `website/docs` cannot: nixpkgs vendors Go dependencies with `go mod vendor`, which keeps only `.go` files. [`examples/pulumi-random`](examples/pulumi-random) documents this case - the check there reports drift in every doc comment even though upstream's committed SDK is perfectly current.
 
 Greenfield bridged providers, whose `make generate` is nothing but a tfgen invocation per language, are the case this is built for.
+
+### Generated SDKs for bridged providers
+
+A drift check is one of two answers to a stale `sdk/` tree.
+The other is not to commit one: `sdks.<lang>.generate = true` codegens that language from the declaration's own `passthru.schema` instead of reading the repo's `sdk/<lang>`, so the tree and the `make generate` that maintains it can be deleted outright.
+
+```nix
+pulumi.terraformBridgeProviders.pulumi-foo = {
+  # ...
+  sdks.nodejs = {
+    generate = true;
+    languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
+    lockFile = ./package-lock.json;
+    npmDepsHash = "sha256-...";
+  };
+
+  sdks.python = {
+    generate = true;
+    languagePlugin = pkgs.pulumiPackages.pulumi-python;
+  };
+};
+```
+
+Pick one per language, not both: a generated SDK has no committed counterpart left for `sdkDrift` to diff against.
+Languages left alone keep building from the repo, so a provider can generate some and commit others.
+
+This runs the same `pulumi package gen-sdk` that [`mkGeneratedSdk`](#mkgeneratedsdk) uses for component providers, against the schema `checks.<name>-schema` already builds.
+That is where a current tfgen ends up anyway - `pkg/tfgen`'s `emitSDK` shells out to exactly that command - so going straight to it needs no second generator, and each language needs its own `languagePlugin` for the same reason [the drift check does](#bridges-that-delegate-codegen).
+
+#### Limitation: language overlays are not applied
+
+`gen-sdk` is only the codegen step.
+tfgen's per-language *overlays* - `info.JavaScript.Overlay`, `info.Golang.Overlay`, `info.Python.Overlay` and friends, the hand-written files a provider's `resources.go` splices into its SDKs around codegen - are not part of the schema, so nothing here can replay them.
+A provider that ships overlays will get an SDK that silently lacks them.
+
+That provider should keep its committed `sdk/` tree and guard it with [`sdkDrift`](#sdk-drift-checks) instead.
+Generation is for providers whose SDKs are pure codegen output, which is most greenfield bridged providers.
+
+#### What still comes from the caller
+
+`gen-sdk` emits language sources and nothing else, so the caller-supplied module files stay required exactly as they are for a committed tree, and for the same reason they are required by [`mkComponentPackage`](#mkcomponentpackage):
+
+- `nodejs` / `yarnNodejs`: `lockFile` + `npmDepsHash`, or `yarnLockFile` + `yarnDepsHash`.
+- `go`: `vendorHash`, plus `importBasePath`, `goMod` and `goSum`. See [`mkGeneratedGoSdk`](#mkgeneratedgosdk) for what those are and how to produce them.
+- `dotnet`: `nugetDeps`.
+
+`narrowSrc` / `srcPaths` do not apply to a generated language: its source is codegen output, already scoped to the one language, with no shared repo tree left to cut down.
+
+Python is generated in place by `mkTerraformBridgeProvider` rather than through `withGeneratedSdks`, which has no python builder ([Known Gaps](TODO.md)).
+It needs no module files either way, so `generate` and `languagePlugin` are all `sdks.python` takes.
 
 ### `mkDynamicBridgeProvider`
 

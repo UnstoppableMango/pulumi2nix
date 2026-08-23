@@ -61,6 +61,48 @@ let
     };
   };
 
+  # Opt a checked-in language out of the committed `sdk/<lang>` tree and codegen
+  # it from the declaration's own schema instead, via lib/with-generated-sdks.nix
+  # (python excepted: mkTerraformBridgeProvider generates that one in place,
+  # since with-generated-sdks.nix has no python builder to hand it to).
+  #
+  # Both default to `null` so `toLangArgs` drops them, leaving the builder's own
+  # default and every existing declaration byte-identical.
+  generation = {
+    generate = mkOption {
+      type = types.nullOr types.bool;
+      default = null;
+      description = ''
+        Generate this SDK from the provider's schema with
+        `pulumi package gen-sdk` instead of building the repo's committed
+        `sdk/<lang>` (default: false). Requires `languagePlugin`.
+
+        gen-sdk emits language sources and nothing else, so the caller-supplied
+        module files stay required exactly as they are for a checked-in tree:
+        `lockFile`/`npmDepsHash` for nodejs, `goMod`/`goSum` (plus
+        `importBasePath`) for go, `nugetDeps` for dotnet.
+
+        This runs codegen against the schema alone, so tfgen's per-language
+        overlays (`info.JavaScript.Overlay` and friends) are not applied. A
+        provider that ships overlays should keep its committed tree and guard it
+        with `sdkDrift` instead.
+
+        `narrowSrc`/`srcPaths` do not apply when this is set: the source is
+        codegen output, already scoped to the one language.
+      '';
+    };
+
+    languagePlugin = mkOption {
+      type = types.nullOr types.package;
+      default = null;
+      description = ''
+        The `pulumi-language-<lang>` host used to run codegen when `generate` is
+        set, e.g. `pkgs.pulumiPackages.pulumi-go`. .NET has no nixpkgs build;
+        use this repo's `pulumi2nix.pulumiLanguageDotnet`. Ignored otherwise.
+      '';
+    };
+  };
+
   sdk =
     options:
     types.nullOr (
@@ -71,8 +113,10 @@ let
     );
 
   # Checked-in SDKs build from the provider repo's own tree, so they are the
-  # ones `narrowing` applies to.
-  checkedInSdk = options: sdk (narrowing // options);
+  # ones `narrowing` applies to. `generation` is the escape hatch out of that
+  # tree, offered here rather than under `generated` because it is a property of
+  # an already-declared language, not a separate list of them.
+  checkedInSdk = options: sdk (narrowing // generation // options);
 
   # `pulumi package gen-sdk` needs the target language's own host binary.
   languagePlugin = required types.package ''
@@ -134,7 +178,9 @@ rec {
           Extra arguments for the python SDK. Unlike the other languages this
           does not select whether a python SDK is built: mkTerraformBridgeProvider
           always builds one, and lib/lang-arg-names.nix deliberately excludes
-          `pythonArgs` from the generic dispatch.
+          `pythonArgs` from the generic dispatch. `generate` still selects where
+          its source comes from, handled by that builder directly rather than by
+          lib/with-generated-sdks.nix.
         '';
       };
     };
