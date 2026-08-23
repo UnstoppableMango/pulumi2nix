@@ -220,6 +220,46 @@ sdks.nodejs = {
 
 Both are also accepted by the builders directly as `nodejsArgs.narrowSrc`, `goArgs.srcPaths`, and so on.
 
+### Consuming a nodejs SDK
+
+A nodejs SDK - checked in or generated, npm or yarn - lands at `$out/lib/node_modules/<pkgName>`, holding the compiled output of `sdk/nodejs` plus its `package.json`, `README.md` and `LICENSE`, the shape Pulumi's own codegen publishes from.
+
+`@pulumi/pulumi` is not shipped inside it.
+It is a runtime `dependencies` entry of every generated SDK, but it has to be a *singleton* in the consuming process: Pulumi's Node runtime keeps the resource monitor address and the stack config at module scope, so a second copy is a second, unconfigured runtime.
+Leaving it out also takes its transitive tree (`@grpc/grpc-js`, `typescript`, `ts-node`, `google-protobuf`) with it, which is most of the output - the `pulumi-command` example's nodejs SDK went from 165M to 200K.
+
+Copy the package into your project rather than symlinking it:
+
+```sh
+mkdir -p node_modules/@unmango
+cp -rL "$sdk/lib/node_modules/@unmango/pulumi-git" node_modules/@unmango/pulumi-git
+```
+
+Symlinking a store path does not work, and would not work with the copy bundled either: node and bun both resolve from the *realpath* of a symlink, so the SDK would look for `@pulumi/pulumi` under `/nix/store` and never see the one your program is using.
+Copying puts the SDK inside your own `node_modules`, where it resolves the same `@pulumi/pulumi` your program does.
+
+The output's `package.json` is upstream's, untouched: it still declares `@pulumi/pulumi` under `dependencies`, so a package manager pointed at the store path installs it for you.
+Note that Pulumi's codegen emits no `main` or `types` field, so resolution falls back to `index.js`/`index.d.ts`.
+That is fine under bun and `moduleResolution: "bundler"`, and worth knowing if anything stricter about `exports` ever enters the picture.
+
+To change which dependencies are left out - to ship everything, or to treat another singleton the same way:
+
+```nix
+sdks.nodejs = {
+  lockFile = ./package-lock.json;
+  npmDepsHash = "sha256-...";
+
+  # Default: [ "@pulumi/pulumi" ]. `[ ]` ships the whole pruned tree.
+  omitDeps = [ "@pulumi/pulumi" "@pulumi/aws" ];
+};
+```
+
+Also accepted directly as `nodejsArgs.omitDeps` / `yarnNodejsArgs.omitDeps`.
+
+One difference between the two builders: npm drops the named packages before pruning, so anything reachable only through them goes too.
+Yarn classic has no real `prune`, so `sdks.yarnNodejs` deletes them from the installed tree afterwards and their orphaned transitive dependencies stay behind.
+Nothing resolves to those, but the output carries them.
+
 ### Overlay
 
 As an alternative to threading `pkgs` through every builder call yourself, `pulumi2nix.overlays.default` applies every `lib` builder directly onto `pkgs`, pre-instantiated against it:

@@ -5,6 +5,7 @@
 # the rest to that language's registered SDK builder.
 {
   lib,
+  attachSdks,
   mkSdk,
   mkGeneratedSdk,
   mkGeneratedGoSdk,
@@ -92,23 +93,12 @@ lib.throwIf (args ? pythonArgs)
     registered in lib/sdks (nodejs, yarnNodejs, go, dotnet) are available.
   ''
   (
-    lib.throwIf (missingGoArgs != [ ])
-      ''
-        withGeneratedSdks: `goArgs` is missing ${lib.concatStringsSep ", " missingGoArgs}.
-        `pulumi package gen-sdk --language go` emits only .go sources, so a generated go
-        SDK additionally needs `importBasePath` (the schema's `language.go.importBasePath`,
-        without which codegen writes self-imports that don't match the directories it just
-        created) plus a `go.mod`/`go.sum` pair, the same way `nodejsArgs` needs a
-        `package-lock.json`. See the README for how to regenerate them.
-      ''
-      (
-        if extraSdks == { } then
-          base
-        else
-          base.overrideAttrs (old: {
-            passthru = (old.passthru or { }) // {
-              sdks = (old.passthru.sdks or { }) // extraSdks;
-            };
-          })
-      )
+    lib.throwIf (missingGoArgs != [ ]) ''
+      withGeneratedSdks: `goArgs` is missing ${lib.concatStringsSep ", " missingGoArgs}.
+      `pulumi package gen-sdk --language go` emits only .go sources, so a generated go
+      SDK additionally needs `importBasePath` (the schema's `language.go.importBasePath`,
+      without which codegen writes self-imports that don't match the directories it just
+      created) plus a `go.mod`/`go.sum` pair, the same way `nodejsArgs` needs a
+      `package-lock.json`. See the README for how to regenerate them.
+    '' (attachSdks base extraSdks)
   )

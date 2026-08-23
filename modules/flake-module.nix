@@ -35,12 +35,14 @@ let
   };
 
   # Keys the module system or this module owns, never forwarded to a builder.
+  # The per-SDK `exposePackage`/`exposeCheck` flags need no entry here: they only
+  # exist inside the `sdks.<lang>` submodules, which `sdks` removes wholesale,
+  # and `toLangArgs` strips them on the path that keeps them.
   internalKeys = [
     "sdks"
     "exposeSchema"
     "_module"
-  ]
-  ++ sdkTypes.exposureNames;
+  ];
 
   stripNull = lib.filterAttrs (_: v: v != null);
 

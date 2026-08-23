@@ -40,6 +40,10 @@ let
     # a language that isn't registered.
     mkSdk = callPackage ./mk-sdk.nix { };
 
+    # Merges a set of built SDKs onto a base derivation's `passthru.sdks`,
+    # shared by both layerers so they chain rather than overwrite each other.
+    attachSdks = callPackage ./attach-sdks.nix { };
+
     # Attaches `<lang>Args`-driven SDK builds to any base derivation's `passthru.sdks`.
     withSdks = callPackage ./with-sdks.nix { };
 

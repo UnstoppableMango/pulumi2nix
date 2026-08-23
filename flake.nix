@@ -74,6 +74,21 @@
               inherit (config.pulumi.lib) srcName;
             };
 
+            # Every other SDK check only asserts that the SDK builds, which a
+            # bundled `@pulumi/pulumi` passes: the breakage is in what the
+            # output *contains*, and only shows up in a consuming program.
+            sdk-omit-deps = pkgs.runCommandLocal "sdk-omit-deps" { } ''
+              pkg=${config.packages.pulumi-command-sdk-nodejs}/lib/node_modules/@pulumi/command
+              test -f "$pkg/index.js"
+
+              if [ -e "$pkg/node_modules/@pulumi/pulumi" ]; then
+                echo "sdk-omit-deps: SDK output bundles its own @pulumi/pulumi" >&2
+                exit 1
+              fi
+
+              touch $out
+            '';
+
             # Filtered to .nix files so an unrelated README edit doesn't rebuild it.
             nix-lint =
               let

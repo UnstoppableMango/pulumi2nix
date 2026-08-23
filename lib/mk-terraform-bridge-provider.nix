@@ -79,87 +79,82 @@ let
       # below key off `distName` rather than the derivation name.
       distName = args.distName or pname;
     in
-    python3Packages.callPackage (
+    python3Packages.buildPythonPackage (
       {
-        buildPythonPackage,
-        parver,
-        pip,
-        pulumi,
-        semver,
-        setuptools,
-      }:
-      buildPythonPackage (
-        {
-          inherit
-            pname
-            meta
-            src
-            version
-            ;
-          pyproject = true;
+        inherit
+          pname
+          meta
+          src
+          version
+          ;
+        pyproject = true;
 
-          sourceRoot = "${srcName src}/sdk/python";
+        sourceRoot = "${srcName src}/sdk/python";
 
-          propagatedBuildInputs = [
-            parver
-            pulumi
-            semver
-            setuptools
-          ];
+        propagatedBuildInputs = with python3Packages; [
+          parver
+          pulumi
+          semver
+          setuptools
+        ];
 
-          postPatch = ''
-            if [[ -e "pyproject.toml" ]]; then
-              sed -i \
-                -e 's/^  version = .*/  version = "${version}"/g' \
-                pyproject.toml
-            else
-              sed -i \
-                 -e 's/^VERSION = .*/VERSION = "${version}"/g' \
-                 -e 's/^PLUGIN_VERSION = .*/PLUGIN_VERSION = "${version}"/g' \
-                 setup.py
-            fi
+        postPatch = ''
+          if [[ -e "pyproject.toml" ]]; then
+            sed -i \
+              -e 's/^  version = .*/  version = "${version}"/g' \
+              pyproject.toml
+          else
+            sed -i \
+               -e 's/^VERSION = .*/VERSION = "${version}"/g' \
+               -e 's/^PLUGIN_VERSION = .*/PLUGIN_VERSION = "${version}"/g' \
+               setup.py
+          fi
 
-            # pkg_resources (used by Pulumi Python SDKs to find their version at
-            # runtime) is deprecated in setuptools v82.0.0 and later. Work around it by
-            # removing the import and patching the version in as a literal.
-            find . -name "_utilities.py" -exec sed -i \
-              -e 's/import pkg_resources//g' \
-              -e 's/pkg_resources.require(root_package)\[0\].version/"${version}"/g' \
-              {} +
-          '';
+          # pkg_resources (used by Pulumi Python SDKs to find their version at
+          # runtime) is deprecated in setuptools v82.0.0 and later. Work around it by
+          # removing the import and patching the version in as a literal.
+          find . -name "_utilities.py" -exec sed -i \
+            -e 's/import pkg_resources//g' \
+            -e 's/pkg_resources.require(root_package)\[0\].version/"${version}"/g' \
+            {} +
+        '';
 
-          # Auto-generated; upstream does not have any tests.
-          # Verify that the version substitution works
-          checkPhase = ''
-            runHook preCheck
+        # Auto-generated; upstream does not have any tests.
+        # Verify that the version substitution works
+        checkPhase = ''
+          runHook preCheck
 
-            ${pip}/bin/pip show "${distName}" | grep "Version: ${version}" > /dev/null \
-              || (echo "ERROR: Version substitution seems to be broken"; exit 1)
+          ${python3Packages.pip}/bin/pip show "${distName}" | grep "Version: ${version}" > /dev/null \
+            || (echo "ERROR: Version substitution seems to be broken"; exit 1)
 
-            runHook postCheck
-          '';
+          runHook postCheck
+        '';
 
-          pythonImportsCheck = [
-            (builtins.replaceStrings [ "-" ] [ "_" ] distName)
-          ];
+        pythonImportsCheck = [
+          (builtins.replaceStrings [ "-" ] [ "_" ] distName)
+        ];
 
-          # nixpkgs' pythonMetadataCheckPhase looks the installed distribution up
-          # by the derivation `pname`, so a lang-qualified `pname` makes it fail
-          # with `PackageNotFoundError` rather than a version mismatch. It only
-          # compares .dist-info's version against `version`, which the `pip show`
-          # check above already does against `distName`, so drop it rather than
-          # give up the qualified name.
-          dontCheckPythonMetadata = distName != pname;
-        }
-        // removeAttrs args (controlArgs ++ [ "distName" ])
-      )
-    ) { };
+        # nixpkgs' pythonMetadataCheckPhase looks the installed distribution up
+        # by the derivation `pname`, so a lang-qualified `pname` makes it fail
+        # with `PackageNotFoundError` rather than a version mismatch. It only
+        # compares .dist-info's version against `version`, which the `pip show`
+        # check above already does against `distName`, so drop it rather than
+        # give up the qualified name.
+        dontCheckPythonMetadata = distName != pname;
+      }
+      // removeAttrs args (controlArgs ++ [ "distName" ])
+    );
 in
 args:
 let
-  # Upstream mk-pulumi-package.nix has no defaults for rev/extraLdflags/env/
-  # meta/fetchSubmodules, so normalize them here before forwarding.
+  # Upstream mk-pulumi-package.nix has no defaults for extraLdflags/env/meta, so
+  # normalize them here before forwarding.
   # Downstream consumers can default them independently for standalone use.
+  #
+  # `rev`/`fetchSubmodules` are deliberately *not* normalized: the only thing
+  # that reads them is the fetch below, which sees the caller's raw `args` and
+  # applies fetchProviderSource's own defaults. Normalizing them here would only
+  # add attrs that `controlArgs` strips again.
   #
   # `src` is resolved here rather than at each use so the gen tool, the resource
   # binary, the python SDK, withSdks and mkTerraformBridgeSchema all share one
@@ -172,8 +167,6 @@ let
   sdkDrift = args.sdkDrift or { };
 
   args' = removeAttrs args [ "sdkDrift" ] // {
-    rev = args.rev or "v${args.version}";
-    fetchSubmodules = args.fetchSubmodules or false;
     extraLdflags = args.extraLdflags or [ ];
     env = args.env or { };
     meta = args.meta or { };
