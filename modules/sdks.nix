@@ -10,14 +10,6 @@
 let
   inherit (lib) mkOption types;
 
-  optional =
-    type: description:
-    mkOption {
-      type = types.nullOr type;
-      default = null;
-      inherit description;
-    };
-
   required = type: description: mkOption { inherit type description; };
 
   # Per-SDK output controls. Consumed by flake-module.nix and stripped before

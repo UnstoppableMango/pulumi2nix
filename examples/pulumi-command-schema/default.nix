@@ -10,7 +10,6 @@ in
     inherit repo version;
 
     owner = "pulumi";
-    rev = "v${version}";
     hash = "sha256-VnbtPhMyTZ4Oy+whOK6Itr2vqUagwZUODONL13fjMaU=";
     vendorHash = "sha256-MBWDEVA29uzHD3B/iPe68ntGjMM1SCTDq/TL+NgMc6c=";
     cmdGen = "pulumi-gen-command";
