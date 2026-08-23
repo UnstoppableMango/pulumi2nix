@@ -35,6 +35,79 @@ Go additionally goes through `mkGeneratedGoSdk`, which attaches the `go.mod`/`go
 
 ## Usage
 
+There are three entry points, in increasing order of how much plumbing they do for you: the [flake module](#flake-module), the [overlay](#overlay), and `pulumi2nix.lib` with `callPackage`.
+
+### Flake module
+
+`pulumi2nix.flakeModules.default` is a [flake-parts](https://flake.parts) module that turns each builder into an option tree, instantiates the builders per system, and wires the results into `packages` and `checks` - including the `passthru.schema` and `passthru.sdks.<lang>` outputs that are otherwise easy to leave untested.
+
+```nix
+{
+  inputs.pulumi2nix.url = "github:UnstoppableMango/pulumi2nix";
+
+  outputs =
+    inputs@{ flake-parts, pulumi2nix, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" ];
+      imports = [ pulumi2nix.flakeModules.default ];
+
+      perSystem = { pkgs, ... }: {
+        pulumi.terraformBridgeProviders.pulumi-random = {
+          owner = "pulumi";
+          repo = "pulumi-random";
+          version = "4.14.0";
+          hash = "sha256-...";
+          vendorHash = "sha256-...";
+          cmdGen = "pulumi-tfgen-random";
+          cmdRes = "pulumi-resource-random";
+          sdks.nodejs = {
+            lockFile = ./package-lock.json;
+            npmDepsHash = "sha256-...";
+          };
+          meta.license = pkgs.lib.licenses.asl20;
+        };
+      };
+    };
+}
+```
+
+That single declaration produces:
+
+| Output | From |
+| --- | --- |
+| `packages.pulumi-random` | the declaration itself |
+| `packages.pulumi-random-schema` | its `passthru.schema` |
+| `packages.pulumi-random-sdk-nodejs` | its `passthru.sdks.nodejs` |
+| `packages.pulumi-random-sdk-python` | ditto - the bridge builder always builds a python SDK |
+
+and mirrors all four into `checks`.
+
+One option tree per builder:
+
+| Option tree | Builder |
+| --- | --- |
+| `pulumi.schemas.<name>` | [`mkSchema`](#mkschema) |
+| `pulumi.nativeSchemas.<name>` | [`mkPulumiSchema`](#mkpulumischema) |
+| `pulumi.terraformBridgeSchemas.<name>` | [`mkTerraformBridgeSchema`](#mkterraformbridgeschema) |
+| `pulumi.componentSchemas.<name>` | [`mkComponentSchema`](#mkcomponentschema) |
+| `pulumi.nativeProviders.<name>` | [`mkPulumiPackage`](#mkpulumipackage) |
+| `pulumi.terraformBridgeProviders.<name>` | [`mkTerraformBridgeProvider`](#mkterraformbridgeprovider) |
+| `pulumi.dynamicBridgeProviders.<name>` | [`mkDynamicBridgeProvider`](#mkdynamicbridgeprovider) |
+| `pulumi.componentPackages.<name>` | [`mkComponentPackage`](#mkcomponentpackage) |
+
+Notes on the shape:
+
+- **SDKs are declared as `sdks.<lang>`**, not the `<lang>Args` the builders take. `lib/lang-arg-names.nix` selects languages by the string suffix `Args` on any key, which would be ambiguous next to the freeform escape hatch below; the module translates `sdks.go` to `goArgs` when it calls the builder.
+- **Undeclared attributes pass straight through** to `buildGoModule`/`stdenv.mkDerivation`, the same way the builders themselves forward them. That is how `postConfigure` and `__darwinAllowLocalNetworking` work. The cost is that a misspelled option name is accepted as a freeform attribute rather than rejected, so a typo usually surfaces as "option ... was accessed but has no value defined" for the option you meant to set.
+- **Names must be unique across every tree, flattened outputs included.** A schema-only build named `foo-schema` collides with provider `foo`'s flattened `passthru.schema`; the module refuses rather than silently dropping one. Rename it, or set `exposeSchema = false` on the provider. `sdks.<lang>.exposePackage` and `sdks.<lang>.exposeCheck` do the same for an individual SDK - `exposeCheck = false` is how `examples/test-component` keeps its known-broken .NET SDK out of `nix flake check`.
+- **`pulumi.packages`** is a read-only map of the declared builds (no flattened schemas or SDKs), useful for a `linkFarm` default package.
+- **`pulumi2nix`** is available as a module argument holding the instantiated builder set, which is where `pulumiLanguageDotnet` comes from.
+- **`overlays.pulumiPackages`** carries the declared builds for the current system, so `pkgs.<name>` resolves after applying it. (It is distinct from `overlays.default`, which applies the *builders* onto `pkgs`.)
+
+Every example under [`examples/`](examples) is written this way.
+
+### `lib` and `callPackage`
+
 Add this repo as a flake input, then obtain each builder via `callPackage` against `pulumi2nix.lib`.
 
 ```nix
@@ -282,7 +355,7 @@ So `goArgs` takes both files from the caller, the same way `nodejsArgs` takes a 
 Regenerate them like this, then `git add` the results:
 
 ```sh
-nix build .#your-package.schema --out-link /tmp/schema
+nix build .#your-package-schema --out-link /tmp/schema
 
 tmp=$(mktemp -d); cd "$tmp"
 jq '.language.go.importBasePath = "github.com/you/your-repo/sdk/go/yourcomponent"' \
