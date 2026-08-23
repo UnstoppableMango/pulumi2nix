@@ -103,6 +103,7 @@ Notes on the shape:
 - **`pulumi.packages`** is a read-only map of the declared builds (no flattened schemas or SDKs), useful for a `linkFarm` default package.
 - **`pulumi2nix`** is available as a module argument holding the instantiated builder set, which is where `pulumiLanguageDotnet` comes from.
 - **`overlays.pulumiPackages`** carries the declared builds for the current system, so `pkgs.<name>` resolves after applying it. (It is distinct from `overlays.default`, which applies the *builders* onto `pkgs`.)
+- **`sdkDrift`** on a bridged provider adds [SDK drift checks](#sdk-drift-checks), which are the only outputs that land in `checks` without a matching entry in `packages`.
 
 Every example under [`examples/`](examples) is written this way.
 
@@ -315,6 +316,43 @@ Both this builder and `mkPulumiPackage` (which delegates to it) always build the
 Its distribution name defaults to `pulumi-` plus `cmdRes` with the `pulumi-resource-` prefix stripped, so `cmdRes = "pulumi-resource-random"` gives `pulumi-random`, matching the name tfgen writes into the generated SDK regardless of what the repo is called.
 `pythonImportsCheck` is derived from that name by replacing `-` with `_`.
 Pass `pythonArgs.pname` and `pythonArgs.pythonImportsCheck` (`sdks.python.*` in the flake module) for an SDK that does not follow the convention.
+
+It also takes an optional `sdkDrift` block, which is what [SDK drift checks](#sdk-drift-checks) below are built from.
+
+### SDK drift checks
+
+`mkTerraformBridgeProvider` reads its per-language SDK source straight out of the source tree's `sdk/<lang>`, so a resource change that lands without a regenerated SDK still builds.
+`checks.<name>-schema` rebuilds `schema.json` from source, but nothing compares the committed SDKs against it, and `nix flake check` stays green against a stale tree.
+
+`sdkDrift.languages` closes that loop.
+For each language listed it re-runs the provider's own `cmdGen` binary - the one the build already compiles - into a scratch directory and `diff -r`s the result against the committed `sdk/<lang>`, emitting `checks.<name>-sdk-<lang>-generated`.
+This is cheap: tfgen emits every language itself, offline, so a drift check costs one more run of an already-built binary rather than another toolchain.
+
+```nix
+pulumi.terraformBridgeProviders.pulumi-foo = {
+  # ...
+  sdkDrift.languages = [
+    "nodejs"
+    "python"
+    "go"
+    "dotnet"
+  ];
+};
+```
+
+The check is check-only: it never appears in `packages`, since its output is an empty marker file.
+
+`exclude` is the list of basenames `diff -r` skips.
+It defaults to `package-lock.json`, `go.mod`, `go.sum` and `version.txt` - the files tfgen never emits, which are therefore committed by hand and would always read as drift.
+Set `exclude` to replace that list outright, or `extraExclude` to add to it.
+
+It is off by default (`languages` starts empty), because it only makes sense where the committed SDK is reproducible from the pinned source:
+
+- The repo must actually commit an `sdk/` tree. Not every declaration does, and a check with nothing to compare against would only ever fail.
+- The repo's own generation step must be a plain `cmdGen <lang> --out sdk/<lang>`. Anything else the repo does on top (patching an `upstream/` submodule, running a Java generator, post-processing) is not replayed here.
+- The gen tool must be able to find its documentation offline. Bridged providers that pull doc comments out of an upstream Terraform provider's `website/docs` cannot: nixpkgs vendors Go dependencies with `go mod vendor`, which keeps only `.go` files. [`examples/pulumi-random`](examples/pulumi-random) documents this case - the check there reports drift in every doc comment even though upstream's committed SDK is perfectly current.
+
+Greenfield bridged providers, whose `make generate` is nothing but a tfgen invocation per language, are the case this is built for.
 
 ### `mkDynamicBridgeProvider`
 

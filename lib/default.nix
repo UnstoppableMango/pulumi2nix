@@ -43,6 +43,10 @@ let
     # Attaches `<lang>Args`-driven SDK builds to any base derivation's `passthru.sdks`.
     withSdks = callPackage ./with-sdks.nix { };
 
+    # Fails when a provider's committed `sdk/<lang>` no longer matches what its
+    # gen tool emits, which the SDK builds themselves cannot notice.
+    mkSdkDriftCheck = callPackage ./mk-sdk-drift-check.nix { };
+
     # The terraform-bridge base builder, using the tfgen schema-generation convention.
     mkTerraformBridgeProvider = callPackage ./mk-terraform-bridge-provider.nix { };
 
