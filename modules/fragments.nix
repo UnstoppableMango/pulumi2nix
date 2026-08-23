@@ -128,7 +128,7 @@ rec {
   componentSchema = {
     languagePlugin = required types.package ''
       The `pulumi-language-<runtime>` host that serves the component's
-      `GetSchema` RPC, e.g. `pkgs.pulumiPackages.pulumi-language-nodejs`.
+      `GetSchema` RPC, e.g. `pkgs.pulumiPackages.pulumi-nodejs`.
     '';
 
     lockFile = required types.raw "The component's own `package-lock.json`.";

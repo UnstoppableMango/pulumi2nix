@@ -554,7 +554,7 @@ mkComponentSchema {
   pname = "test-component-schema";
   version = "0.0.1";
   src = ./.;
-  languagePlugin = pulumiPackages.pulumi-language-nodejs;
+  languagePlugin = pulumiPackages.pulumi-nodejs;
   lockFile = ./package-lock.json;
   npmDepsHash = "sha256-...";
   # Optional: seed the plugin cache for components that import another
@@ -620,12 +620,12 @@ mkComponentPackage {
   version = "0.0.1";
   src = ./.;
   schemaArgs = {
-    languagePlugin = pulumiPackages.pulumi-language-nodejs;
+    languagePlugin = pulumiPackages.pulumi-nodejs;
     lockFile = ./package-lock.json;
     npmDepsHash = "sha256-...";
   };
   nodejsArgs = {
-    languagePlugin = pulumiPackages.pulumi-language-nodejs;
+    languagePlugin = pulumiPackages.pulumi-nodejs;
     lockFile = ./generated-sdk/nodejs/package-lock.json;
     npmDepsHash = "sha256-...";
   };
@@ -657,7 +657,7 @@ mkGeneratedSdk {
   version = "0.0.1";
   schema = mkComponentSchema { /* ... */ };
   lang = "nodejs";
-  languagePlugin = pulumiPackages.pulumi-language-nodejs;
+  languagePlugin = pulumiPackages.pulumi-nodejs;
   # schemaOverrides.language.go.importBasePath = "github.com/you/your-repo/sdk/go/yourcomponent";
   meta.license = lib.licenses.asl20;
 }
