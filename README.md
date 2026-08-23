@@ -99,7 +99,7 @@ Notes on the shape:
 
 - **SDKs are declared as `sdks.<lang>`**, not the `<lang>Args` the builders take. `lib/lang-arg-names.nix` selects languages by the string suffix `Args` on any key, which would be ambiguous next to the freeform escape hatch below; the module translates `sdks.go` to `goArgs` when it calls the builder.
 - **Undeclared attributes pass straight through** to `buildGoModule`/`stdenv.mkDerivation`, the same way the builders themselves forward them. That is how `postConfigure` and `__darwinAllowLocalNetworking` work. The cost is that a misspelled option name is accepted as a freeform attribute rather than rejected, so a typo usually surfaces as "option ... was accessed but has no value defined" for the option you meant to set.
-- **Names must be unique across every tree, flattened outputs included.** A schema-only build named `foo-schema` collides with provider `foo`'s flattened `passthru.schema`; the module refuses rather than silently dropping one. Rename it, or set `exposeSchema = false` on the provider. `sdks.<lang>.exposePackage` and `sdks.<lang>.exposeCheck` do the same for an individual SDK - `exposeCheck = false` is how `examples/test-component` keeps its known-broken .NET SDK out of `nix flake check`.
+- **Names must be unique across every tree, flattened outputs included.** A schema-only build named `foo-schema` collides with provider `foo`'s flattened `passthru.schema`; the module refuses rather than silently dropping one. Rename it, or set `exposeSchema = false` on the provider. `sdks.<lang>.exposePackage` and `sdks.<lang>.exposeCheck` do the same for an individual SDK - set `exposeCheck = false` to keep an SDK whose build is known-broken or prohibitively slow out of `nix flake check`.
 - **`pulumi.packages`** is a read-only map of the declared builds (no flattened schemas or SDKs), useful for a `linkFarm` default package.
 - **`pulumi2nix`** is available as a module argument holding the instantiated builder set, which is where `pulumiLanguageDotnet` comes from.
 - **`overlays.pulumiPackages`** carries the declared builds for the current system, so `pkgs.<name>` resolves after applying it. (It is distinct from `overlays.default`, which applies the *builders* onto `pkgs`.)
@@ -451,6 +451,9 @@ mkGeneratedGoSdk {
 ### `pulumiLanguageDotnet`
 
 Not a package builder but a pinned build of the `pulumi-language-dotnet` host binary, filling the gap left by nixpkgs' `pulumiPackages` (which packages Go, Node.js, and Python language hosts, but not .NET).
+It is patched so that its codegen reads a nix-fetched `pulumi_logo_64x64.png` instead of downloading one while writing each SDK's `logo.png`, which is what lets `pulumi package gen-sdk --language dotnet` run inside a build sandbox at all.
+The tradeoff is that a schema's `logoUrl` no longer affects the generated `logo.png`: every .NET SDK gets the generic Pulumi icon, since an output that varied with network reachability would not be reproducible.
+
 Feed its result as the `languagePlugin` for any `dotnetArgs` block above:
 
 ```nix

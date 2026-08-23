@@ -33,12 +33,6 @@
       dotnet = {
         languagePlugin = pulumi2nix.pulumiLanguageDotnet;
         nugetDeps = ./generated-sdk/dotnet/deps.json;
-
-        # `pulumi package gen-sdk --language dotnet` fetches
-        # pulumi_logo_64x64.png from raw.githubusercontent.com while writing the
-        # SDK, so this build cannot succeed in a sandbox. Kept out of `checks`
-        # until that is fixed; see TODO.md.
-        exposeCheck = false;
       };
     };
 
