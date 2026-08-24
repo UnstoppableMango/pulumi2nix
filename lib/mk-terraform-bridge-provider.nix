@@ -13,12 +13,6 @@
   narrowSdkSrc,
 }:
 let
-  # Args this file consumes itself, already folded into `src`, `sourceRoot`,
-  # `subPackages` or `ldflags`, so forwarding them would only plant inert
-  # environment variables that fork the tfgen build in two: mk-schema.nix
-  # builds the byte-identical binary from named formals, so its `pulumi-gen`
-  # would otherwise differ from this one by these vars alone, invalidating
-  # the provider on any unrelated change to them.
   controlArgs = [
     "cmd"
     "cmdGen"
@@ -32,8 +26,6 @@ let
     "sdks"
   ];
 
-  # Ported from nixpkgs' mk-pulumi-package.nix so this repo owns the build
-  # recipe instead of reaching into a nixpkgs checkout at eval time.
   mkBasePackage =
     {
       src,
@@ -67,10 +59,6 @@ let
       ...
     }@args:
     let
-      # The derivation `pname` is lang-qualified so the provider and its SDKs
-      # don't land in the store under the same name. The Python *distribution*
-      # name is separate: it's what pyproject.toml declares, what pip installs,
-      # and what gets imported, so the checks below key off `distName` instead.
       distName = args.distName or pname;
     in
     python3Packages.buildPythonPackage (
@@ -104,17 +92,12 @@ let
                setup.py
           fi
 
-          # pkg_resources, which Pulumi Python SDKs use to find their version at
-          # runtime, is deprecated in setuptools. Remove the import and patch the
-          # version in as a literal instead.
           find . -name "_utilities.py" -exec sed -i \
             -e 's/import pkg_resources//g' \
             -e 's/pkg_resources.require(root_package)\[0\].version/"${version}"/g' \
             {} +
         '';
 
-        # Auto-generated; upstream does not have any tests.
-        # Verify that the version substitution works
         checkPhase = ''
           runHook preCheck
 
@@ -128,11 +111,6 @@ let
           (builtins.replaceStrings [ "-" ] [ "_" ] distName)
         ];
 
-        # nixpkgs' pythonMetadataCheckPhase looks the installed distribution up
-        # by the derivation `pname`, so a lang-qualified `pname` makes it fail with
-        # `PackageNotFoundError` instead of catching a real version mismatch. Drop
-        # it here rather than give up the qualified name; the `pip show` check
-        # above already covers the same comparison against `distName`.
         dontCheckPythonMetadata = distName != pname;
       }
       // removeAttrs args (controlArgs ++ [ "distName" ])
@@ -140,11 +118,6 @@ let
 in
 args:
 let
-  # Upstream mk-pulumi-package.nix has no defaults for extraLdflags/env/meta, so
-  # normalize them here before forwarding. `src` is resolved once here, defaulting
-  # to a fetch of `owner`/`repo`/`rev`/`hash`, so the gen tool, resource binary,
-  # python SDK, withSdks and mkTerraformBridgeSchema all share one source; pass
-  # `src` directly to build from a local checkout instead.
   sdkDrift = args.sdkDrift or { };
 
   args' = removeAttrs args [ "sdkDrift" ] // {
@@ -160,37 +133,14 @@ let
 
   pythonArgs = base'.pythonArgs or { };
 
-  # Built here rather than inside the final `passthru` so the generated SDKs
-  # below and `passthru.schema` are the same derivation, not two byte-identical
-  # ones evaluated from the same args.
   schema = mkTerraformBridgeSchema args';
 
-  # A per-language `generate` splits the `<lang>Args` blocks between the two
-  # layerers: `false` (the default) keeps reading the repo's committed
-  # `sdk/<lang>`, `true` codegens that language from the schema above instead,
-  # so a greenfield provider can drop its `sdk/` tree and the Makefile that
-  # regenerates it.
-  #
-  # KNOWN LIMITATION: generating only replays `pulumi package gen-sdk`, not the
-  # provider's own per-language overlays (`info.JavaScript.Overlay`,
-  # `info.Golang.Overlay`, ...) that `resources.go` splices in around codegen,
-  # since nothing about them reaches the schema. A provider that ships overlays
-  # has to keep its committed tree and guard it with `sdkDrift` instead; see the
-  # README.
   generates = name: args'.${name}.generate or false;
   langNames = langArgNames args';
   generatedNames = lib.filter generates langNames;
 
-  # `generate` selects a layerer, it is not a builder argument, so it is
-  # stripped from every block whichever way it was set. The narrowing options go
-  # with it for a generated language: there is no shared repo tree left to cut
-  # down, the source is codegen output already scoped to the one language.
   forwarded = name: removeAttrs args'.${name} ([ "generate" ] ++ narrowSdkSrc.optionNames);
 
-  # Lang-qualified for the same reason withSdks does it. Spelled here because
-  # with-generated-sdks.nix names its SDKs after the *package*, and this builder
-  # (unlike component-provider callers) gives the base derivation no distinct
-  # `-component` pname. Merged first, so a caller's own `pname` wins.
   generatedArgs = lib.genAttrs generatedNames (
     name: { pname = "${base'.repo}-sdk-${lib.removeSuffix "Args" name}"; } // forwarded name
   );
@@ -201,10 +151,6 @@ let
       name: removeAttrs args'.${name} [ "generate" ]
     );
 
-  # Both consumers pull `languagePlugin` straight out of the language's block,
-  # so omitting it surfaces as a bare `attribute 'languagePlugin' missing`
-  # pointing at a file the caller never wrote. Name the language and say what
-  # to do about it instead.
   missingPlugins = lib.filter (name: !(args'.${name} ? languagePlugin)) (
     generatedNames ++ lib.optional (pythonArgs.generate or false) "pythonArgs"
   );
@@ -220,12 +166,6 @@ let
     or drop `generate` to keep building the repo's committed `sdk/<lang>`.
   '';
 
-  # Python has no registered builder in with-generated-sdks.nix, only the
-  # upstream nixpkgs one this file delegates to, so `generate` is honoured in
-  # place: hand mkGeneratedSdk's output to the same mkPythonPackage instead of
-  # the narrowed repo tree. `srcName` reads the generated derivation's `.name`,
-  # so `sourceRoot` resolves to `<repo>-generated-sdk-python/sdk/python`, where
-  # `gen-sdk --out $out/sdk` writes.
   pythonSrc =
     if pythonArgs.generate or false then
       mkGeneratedSdk {
@@ -279,20 +219,10 @@ let
         {
           inherit (base') meta version;
 
-          # Only `sdk/python` of the shared tree, the same narrowing withSdks
-          # applies to the other languages (see lib/narrow-sdk-src.nix), unless
-          # `pythonArgs.generate` swapped the tree out for codegen output.
           src = pythonSrc;
 
-          # Lang-qualified for the same reason as withSdks' layered SDKs: an
-          # unqualified `repo` makes the provider and its SDKs indistinguishable
-          # in store paths and build logs.
           pname = "${base'.repo}-sdk-python";
 
-          # tfgen names the python distribution after the *Pulumi package*, not
-          # the repo, e.g. `pulumi-resource-git` ships `sdk/python` as
-          # `pulumi_git`. Deriving this from `repo` only works for repos named
-          # `pulumi-<name>`; `sdks.python.pname` is the escape hatch for the rest.
           distName = pythonArgs.pname or ("pulumi-" + lib.removePrefix "pulumi-resource-" base'.cmdRes);
         }
         // removeAttrs pythonArgs (
@@ -304,29 +234,12 @@ let
         )
       );
     }
-    # `controlArgs` are stripped by mkBasePackage, which sees this whole merged
-    # attrset; only `pythonArgs` has to go before the merge, so a caller's block
-    # can't shadow the `passthru.sdks.python` already built from it.
     // (removeAttrs base' [ "pythonArgs" ])
   );
 
-  # A drift check per language re-runs `pulumi-gen`, the binary this build
-  # already compiles, rather than standing up a second toolchain. Opt-in via
-  # `sdkDrift.languages`: not every provider repo commits an `sdk/` tree, and a
-  # check that cannot find one should not be the default.
-  #
-  # `languages` is a plain list when the gen tool codegens in-process and needs
-  # nothing but itself; providers whose bridge shells out to `pulumi package
-  # gen-sdk` give an attrset instead and name a `languagePlugin` per language.
-  # Both spellings normalize to the same attrset here; see
-  # lib/mk-sdk-drift-check.nix for why the two cannot be told apart from inside
-  # the build.
   langs = sdkDrift.languages or [ ];
   driftLangs = if lib.isList langs then lib.genAttrs langs (_: { }) else langs;
 
-  # Per-language attrs land last so a language that needs its own `exclude` /
-  # `extraExclude` (dotnet's `logo.png`, say) overrides the block shared by all
-  # of them rather than being overridden by it.
   sdkDriftChecks = lib.mapAttrs (
     lang: langArgs:
     mkSdkDriftCheck (
@@ -342,10 +255,6 @@ let
     )
   ) driftLangs;
 
-  # The two layerers chain rather than compete: each one *overrides*
-  # `passthru.sdks` onto whatever the derivation beneath it already carries, so
-  # a provider that generates one language and commits another ends up with both
-  # (and python, attached by `base` itself, survives either way).
   withSdksResult = withSdks (checkedInArgs // { inherit base; });
 
   layered = withGeneratedSdks (

@@ -1,8 +1,5 @@
 { lib, pkgs, ... }:
 {
-  # Named for its mechanism (`pulumi package get-schema`) rather than
-  # `test-component-schema`, which the test-component package already claims via
-  # its flattened `passthru.schema`. `pname` defaults to the attribute name.
   pulumi.componentSchemas.test-component-get-schema = {
     version = "0.0.1";
     src = ./.;

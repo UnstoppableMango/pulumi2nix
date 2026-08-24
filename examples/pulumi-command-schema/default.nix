@@ -4,8 +4,6 @@ let
   version = "0.9.0";
 in
 {
-  # Named for its mechanism rather than `pulumi-command-schema`, which the
-  # pulumi-command provider already claims via its flattened `passthru.schema`.
   pulumi.nativeSchemas.pulumi-command-gen-schema = {
     inherit repo version;
 

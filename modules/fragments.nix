@@ -1,22 +1,8 @@
-# Reusable groups of options, merged into the per-builder submodules in
-# options.nix. Each group is a plain attrset of `mkOption`s rather than a
-# module, so a tree that needs a different default (e.g. mkDynamicBridgeProvider
-# defaulting `owner`/`repo`) can override a single entry with `//`.
-#
-# Types stay deliberately loose wherever the underlying builder is loose:
-# `src` accepts a plain path, a store path, or a fetcher output (lib/src-name.nix
-# resolves all three), so it is `raw` rather than `types.package`.
 { lib }:
 let
   inherit (lib) mkOption types;
 in
 rec {
-  # Optional args are `null` by default and stripped before reaching a builder.
-  # The builders test presence with `args.owner or (throw ...)`, so a literal
-  # `owner = null` would satisfy `?` and slip a null into fetchFromGitHub.
-  #
-  # Exported alongside the fragments so modules/sdks.nix shares one definition
-  # rather than restating them.
   optional =
     type: description:
     mkOption {
@@ -31,7 +17,6 @@ rec {
       inherit type description;
     };
 
-  # Carried by every builder.
   common = {
     version = required types.str ''
       Package version. Also the default `rev` (as `v''${version}`) for builders
@@ -45,8 +30,6 @@ rec {
     };
   };
 
-  # Everything the upstream-repo fetch and the Go build need. Shared by every
-  # schema/provider builder that starts from a Pulumi provider repo.
   upstream = {
     owner = optional types.str ''
       GitHub owner for the default fetch. Required unless `src` is supplied.
@@ -97,7 +80,6 @@ rec {
     };
   };
 
-  # The two `cmd/<name>` binaries a provider repo builds.
   goCmds = {
     cmdGen = required types.str ''
       Name of the schema-generation command under `provider/cmd/`, e.g.
@@ -110,8 +92,6 @@ rec {
     '';
   };
 
-  # Source-based (component) providers name themselves rather than deriving a
-  # pname from `repo`.
   componentSource = {
     pname = required types.str "Package name.";
 
@@ -124,12 +104,6 @@ rec {
     '';
   };
 
-  # `pulumi package get-schema` needs a language host plus an offline dependency
-  # cache. It runs the nodejs install itself and picks its package manager from
-  # the lockfile in the tree, so which pair is given selects npm or yarn
-  # classic, the same split that separates `sdks.nodejs` from `sdks.yarnNodejs`.
-  # Both pairs are `optional` here; mkComponentSchema throws unless exactly one
-  # complete pair is supplied.
   componentSchema = {
     languagePlugin = required types.package ''
       The `pulumi-language-<runtime>` host that serves the component's

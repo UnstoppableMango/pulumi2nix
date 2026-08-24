@@ -17,7 +17,6 @@ lib.throwIfNot (args ? postConfigure)
   ''
   (
     (mkTerraformBridgeProvider args).overrideAttrs (old: {
-      # Overrides the terraform-bridge schema convention with the native gen-tool one.
       passthru = old.passthru // {
         schema = mkPulumiSchema args;
       };

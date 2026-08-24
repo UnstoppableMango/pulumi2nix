@@ -28,7 +28,6 @@
   pname,
   version,
   meta ? { },
-  # List of { name, version, plugin }, seeded into the plugin cache before get-schema runs.
   providerPlugins ? [ ],
   ...
 }@args:
@@ -36,9 +35,6 @@ let
   useNpm = lockFile != null && npmDepsHash != null;
   useYarn = yarnLockFile != null && yarnDepsHash != null;
 
-  # `sourceRoot` is not a formal: it is forwarded verbatim like every other
-  # unrecognised arg, and read back out of `rest` for the one place that needs
-  # it separately (the npm dep fetch, which unpacks the same tree).
   rest = removeAttrs args [
     "lockFile"
     "npmDepsHash"
@@ -92,10 +88,6 @@ let
       hash = yarnDepsHash;
     };
 
-    # No yarnBuildHook/yarnInstallHook: this derivation only reads the tree to
-    # answer `GetSchema`, it never packages it. yarnConfigHook alone matters,
-    # since it runs in configurePhase and populates `node_modules` from the
-    # offline cache before get-schema's own install looks for it.
     nativeBuildInputs = [
       nodejs
       yarnConfigHook
@@ -104,18 +96,6 @@ let
     ];
   };
 
-  # Both branches re-establish offline resolution for the install `get-schema`
-  # runs itself: a fresh `yarn install` / `npm install` in the language host's
-  # own process, outside the nixpkgs hooks' control. npm reads
-  # `npm_config_offline` straight out of the environment.
-  #
-  # yarn needs more: a populated `node_modules` alone is not enough, since
-  # `pulumi-language-nodejs` runs a plain `yarn install` that re-resolves from
-  # the lockfile and hits the network unless it finds the offline mirror.
-  # yarnConfigHook wrote the `yarn-offline-mirror` setting to its own `$HOME`,
-  # which the `HOME=$TMPDIR` the pulumi CLI needs then discards, so
-  # re-pointing the new HOME at the same cache lets the install complete
-  # offline with no `YARN_*` env var.
   installEnv =
     if useNpm then
       ''

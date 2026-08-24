@@ -22,7 +22,6 @@ let
   sdkTypes = import ./sdks.nix { inherit lib; };
   treeOptions = import ./options.nix { inherit lib; };
 
-  # Option tree -> the lib/default.nix builder it dispatches to.
   builders = {
     schemas = "mkSchema";
     nativeSchemas = "mkPulumiSchema";
@@ -34,10 +33,6 @@ let
     componentPackages = "mkComponentPackage";
   };
 
-  # Keys the module system or this module owns, never forwarded to a builder.
-  # The per-SDK `exposePackage`/`exposeCheck` flags need no entry here: `sdks`
-  # removes their enclosing `sdks.<lang>` submodules wholesale, and
-  # `toLangArgs` strips them on the path that keeps them.
   internalKeys = [
     "sdks"
     "exposeSchema"
@@ -46,8 +41,6 @@ let
 
   stripNull = lib.filterAttrs (_: v: v != null);
 
-  # Submodule configs carry `_module`; strip it wherever a submodule value is
-  # forwarded as a plain attrset.
   stripModule = attrs: removeAttrs attrs [ "_module" ];
 
   cleanArgs =
@@ -66,14 +59,6 @@ let
       sdkDrift = cleanSdkDrift base.sdkDrift;
     };
 
-  # `sdkDrift.languages` is either a plain list of names or an attrset of
-  # per-language submodules, so the nested cleanup only applies to the second
-  # shape. Dropping nulls is the load-bearing half: the builder merges these
-  # attrs *last*, so an unset `languagePlugin = null` would otherwise land on
-  # top of the shared block's value instead of falling through to it.
-  # `stripModule` is defensive: these attrsets are forwarded verbatim into
-  # mkSdkDriftCheck's named formals, which have no ellipsis to absorb a stray
-  # `_module`.
   cleanSdkDrift =
     sdkDrift:
     let
@@ -90,8 +75,6 @@ in
     let
       cfg = config.pulumi;
 
-      # Flat list of every declaration across every tree, so the names they all
-      # claim can be checked for collisions in one place.
       declarations = lib.concatLists (
         lib.mapAttrsToList (
           tree: builder:
@@ -105,8 +88,6 @@ in
         ) builders
       );
 
-      # `null` on a per-declaration or per-SDK flag means "inherit the tree-wide
-      # default".
       resolve = value: fallback: if value == null then fallback else value;
 
       exposeSchema = d: resolve (d.cfg.exposeSchema or null) cfg.exposeSchemas;
@@ -130,19 +111,12 @@ in
           lang: sdk: lib.optionalAttrs (exposeSdk d lang flag fallback) { "${d.name}-sdk-${lang}" = sdk; }
         ) (d.drv.passthru.sdks or { });
 
-      # Drift checks never become packages: an empty marker file is not
-      # something anyone wants to `nix build`, and the whole point is that
-      # `nix flake check` notices a stale SDK.
       driftChecksOf =
         d:
         lib.concatMapAttrs (lang: check: { "${d.name}-sdk-${lang}-generated" = check; }) (
           d.drv.passthru.sdkDriftChecks or { }
         );
 
-      # Two declarations can collide either directly (same name in two trees) or
-      # through flattening: a standalone `mkTerraformBridgeSchema` named
-      # `foo-schema` claims the same output as provider `foo`'s `passthru.schema`.
-      # Merging with `//` would silently drop one, so refuse instead.
       mergeUnique =
         what: sets:
         let
@@ -223,8 +197,6 @@ in
     }
   );
 
-  # Reads the system off `prev`, not `final`: `final.stdenv` is unbuilt while
-  # the overlay list is being applied, so touching it here recurses.
   config.flake.overlays.pulumiPackages =
     _final: prev:
     withSystem prev.stdenv.hostPlatform.system ({ config, ... }: config.pulumi.overlayAttrs);

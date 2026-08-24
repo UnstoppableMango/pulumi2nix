@@ -11,9 +11,6 @@ let
 
   inherit (import ./fragments.nix { inherit lib; }) required;
 
-  # Per-SDK output controls. Consumed by flake-module.nix and stripped before
-  # the remaining args reach a builder. `null` means "inherit the tree-wide
-  # `pulumi.exposeSdks` / `pulumi.exposeSdkChecks` default".
   exposure = {
     exposePackage = mkOption {
       type = types.nullOr types.bool;
@@ -32,11 +29,6 @@ let
     };
   };
 
-  # Control over lib/narrow-sdk-src.nix, which hands each checked-in SDK only
-  # the part of the shared provider tree it builds from. `null` keeps the
-  # builder's own default; both are dropped by `toLangArgs` when left unset.
-  # Not offered for generated SDKs: their source is codegen output, already
-  # scoped to the one language.
   narrowing = {
     narrowSrc = mkOption {
       type = types.nullOr types.bool;
@@ -60,13 +52,6 @@ let
     };
   };
 
-  # Opt a checked-in language out of the committed `sdk/<lang>` tree and codegen
-  # it from the declaration's own schema instead, via lib/with-generated-sdks.nix
-  # (python excepted: mkTerraformBridgeProvider generates that one in place,
-  # since with-generated-sdks.nix has no python builder to hand it to).
-  #
-  # Both default to `null` so `toLangArgs` drops them, leaving the builder's own
-  # default and every existing declaration byte-identical.
   generation = {
     generate = mkOption {
       type = types.nullOr types.bool;
@@ -111,22 +96,14 @@ let
       }
     );
 
-  # Checked-in SDKs build from the provider repo's own tree, so they are the
-  # ones `narrowing` applies to. `generation` is the escape hatch out of that
-  # tree, offered here rather than under `generated` because it is a property of
-  # an already-declared language, not a separate list of them.
   checkedInSdk = options: sdk (narrowing // generation // options);
 
-  # `pulumi package gen-sdk` needs the target language's own host binary.
   languagePlugin = required types.package ''
     The `pulumi-language-<lang>` host used to run codegen, e.g.
     `pkgs.pulumiPackages.pulumi-go`. .NET has no nixpkgs build; use this
     repo's `pulumi2nix.pulumiLanguageDotnet`.
   '';
 
-  # Both nodejs builders bundle their pruned `node_modules` into the output, so
-  # both take the same escape hatch out of it. `null` leaves the builder's own
-  # default of `[ "@pulumi/pulumi" ]`, dropped by `toLangArgs` when unset.
   omitDeps = mkOption {
     type = types.nullOr (types.listOf types.str);
     default = null;
@@ -157,8 +134,6 @@ let
   };
 in
 rec {
-  # Languages whose SDK source is checked into the upstream provider repo under
-  # `sdk/<lang>`, layered on by lib/with-sdks.nix.
   checkedIn = types.submodule {
     options = {
       nodejs = mkOption {
@@ -203,8 +178,6 @@ rec {
     };
   };
 
-  # Languages whose SDK source is generated on demand from a schema.json by
-  # lib/with-generated-sdks.nix. Each needs its own `languagePlugin`.
   generated = types.submodule {
     options = {
       nodejs = mkOption {
@@ -251,11 +224,8 @@ rec {
     };
   };
 
-  # Module-only keys, never forwarded to a builder.
   exposureNames = builtins.attrNames exposure;
 
-  # `{ go = {...}; }` -> `{ goArgs = {...}; }`, dropping unset languages, the
-  # exposure flags, and any null-valued option default.
   toLangArgs =
     sdks:
     lib.mapAttrs' (lang: cfg: {
