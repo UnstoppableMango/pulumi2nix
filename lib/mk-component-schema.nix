@@ -73,7 +73,7 @@ let
             explicit { name, version, plugin } form instead.
           '')
         );
-        version = p.version;
+        inherit (p) version;
         plugin = "${p}/bin";
       }
     else
