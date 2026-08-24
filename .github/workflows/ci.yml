@@ -22,11 +22,11 @@ jobs:
       - run: nix flake check
       - run: nix build .#
 
-  # Builds unmango/pulumipkgs against this working tree, so a change that breaks
-  # the builders pulumipkgs consumes fails here instead of downstream. Blocking,
-  # which means it tracks an external repo's main branch as a merge gate: if
-  # pulumipkgs' own main is broken this job goes red for reasons that have
-  # nothing to do with the PR. Read the failure before assuming it is yours.
+  # Builds unmango/pulumipkgs against this working tree, so a change that
+  # breaks the builders pulumipkgs consumes fails here instead of downstream.
+  # Blocking, so it tracks an external repo's main branch as a merge gate: a
+  # broken pulumipkgs main can turn this job red for reasons unrelated to the
+  # PR. Read the failure before assuming it is yours.
   integration:
     runs-on: ubuntu-latest
     steps:

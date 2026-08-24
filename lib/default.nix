@@ -47,7 +47,7 @@ let
     # Attaches `<lang>Args`-driven SDK builds to any base derivation's `passthru.sdks`.
     withSdks = callPackage ./with-sdks.nix { };
 
-    # Fails when a provider's committed `sdk/<lang>` no longer matches what its
+    # Fails when a provider's committed `sdk/<lang>` doesn't match what its
     # gen tool emits, which the SDK builds themselves cannot notice.
     mkSdkDriftCheck = callPackage ./mk-sdk-drift-check.nix { };
 

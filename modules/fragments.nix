@@ -126,10 +126,10 @@ rec {
 
   # `pulumi package get-schema` needs a language host plus an offline dependency
   # cache. It runs the nodejs install itself and picks its package manager from
-  # the lockfile in the tree, so which pair is given is what selects npm or yarn
-  # classic - the same split that separates `sdks.nodejs` from `sdks.yarnNodejs`.
-  # Both pairs are `optional` here because neither is required on its own;
-  # mkComponentSchema throws unless exactly one complete pair is supplied.
+  # the lockfile in the tree, so which pair is given selects npm or yarn
+  # classic, the same split that separates `sdks.nodejs` from `sdks.yarnNodejs`.
+  # Both pairs are `optional` here; mkComponentSchema throws unless exactly one
+  # complete pair is supplied.
   componentSchema = {
     languagePlugin = required types.package ''
       The `pulumi-language-<runtime>` host that serves the component's

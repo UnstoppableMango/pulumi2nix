@@ -1,31 +1,24 @@
-# A dynamically bridged provider wraps *any* Terraform provider at runtime
-# (via `pulumi package add terraform-provider ...` parameterization) instead
-# of being generated ahead-of-time for one specific upstream provider like
-# mkTerraformBridgeProvider's forks are. It is therefore a single, generic
-# `pulumi-resource-terraform-provider` binary built straight from
-# pulumi/pulumi-terraform-bridge's `./dynamic` package - there is no
-# per-provider owner/repo/schema to plug in here.
-#
-# Source lives in pulumi/pulumi-terraform-bridge (the `dynamic` directory is
-# a plain subpackage of that module, not its own go.mod); pulumi/pulumi-terraform-provider
-# only hosts releases built from it. See that repo's dynamic/README.md and
-# dynamic/Makefile.
+# A dynamically bridged provider wraps *any* Terraform provider at runtime (via
+# `pulumi package add terraform-provider ...` parameterization) instead of
+# being generated ahead-of-time for one specific upstream provider like
+# mkTerraformBridgeProvider's forks are, so it is a single, generic
+# `pulumi-resource-terraform-provider` binary built from
+# pulumi/pulumi-terraform-bridge's `./dynamic` package with no per-provider
+# owner/repo/schema to plug in. Source lives in pulumi/pulumi-terraform-bridge;
+# pulumi/pulumi-terraform-provider only hosts releases built from it. See that
+# repo's dynamic/README.md and dynamic/Makefile.
 {
   buildGoModule,
   fetchProviderSource,
 }:
 # `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build from
-# a local checkout or a different fetcher. `hash` is only forced by that default,
-# so a caller supplying `src` can omit it.
-#
-# `rev` names the source; `versionString` is what the binary reports, and the two
-# are separate because they genuinely differ here. `pulumi/pulumi-terraform-provider`
-# only hosts docs and releases: the code is `pulumi/pulumi-terraform-bridge`'s
-# `dynamic/` directory, and a `pulumi-terraform-provider` release names the bridge
-# *commit* it was generated from rather than a bridge tag. So a release-accurate
+# a local checkout or a different fetcher, in which case `hash` can be omitted.
+# `rev` names the source and `versionString` is what the binary reports, kept
+# separate because a `pulumi-terraform-provider` release names the bridge
+# *commit* it was generated from rather than a bridge tag: a release-accurate
 # build is `rev = "<sha>"` with `versionString = "v1.1.3"`. `versionString`
-# defaults to `rev`, which is correct for every caller where the release tag and
-# the source revision are the same string.
+# defaults to `rev`, correct whenever the release tag and source revision are
+# the same string.
 {
   owner ? "pulumi",
   repo ? "pulumi-terraform-bridge",

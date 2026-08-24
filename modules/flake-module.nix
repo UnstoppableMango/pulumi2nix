@@ -8,8 +8,8 @@
 # Each declaration becomes `packages.<name>`, and its `passthru.schema` /
 # `passthru.sdks.<lang>` are flattened out into `packages.<name>-schema` and
 # `packages.<name>-sdk-<lang>`. Everything is mirrored into `checks`, which is
-# what puts generated SDKs under `nix flake check` for the first time, alongside
-# the check-only `checks.<name>-sdk-<lang>-generated` SDK drift checks.
+# what puts generated SDKs under `nix flake check`, alongside the check-only
+# `checks.<name>-sdk-<lang>-generated` SDK drift checks.
 {
   lib,
   flake-parts-lib,
@@ -35,9 +35,9 @@ let
   };
 
   # Keys the module system or this module owns, never forwarded to a builder.
-  # The per-SDK `exposePackage`/`exposeCheck` flags need no entry here: they only
-  # exist inside the `sdks.<lang>` submodules, which `sdks` removes wholesale,
-  # and `toLangArgs` strips them on the path that keeps them.
+  # The per-SDK `exposePackage`/`exposeCheck` flags need no entry here: `sdks`
+  # removes their enclosing `sdks.<lang>` submodules wholesale, and
+  # `toLangArgs` strips them on the path that keeps them.
   internalKeys = [
     "sdks"
     "exposeSchema"
@@ -68,18 +68,12 @@ let
 
   # `sdkDrift.languages` is either a plain list of names or an attrset of
   # per-language submodules, so the nested cleanup only applies to the second
-  # shape. Each language config gets the same treatment as the enclosing block,
-  # for the same two reasons.
-  #
-  # Dropping nulls is the load-bearing half: the builder merges these attrs
-  # *last*, so that a language's own `exclude` beats the shared one, which means
-  # an unset `languagePlugin = null` would land on top of anything the shared
-  # block said rather than falling through to it.
-  #
-  # `stripModule` is defensive, as it is above: current nixpkgs' `submoduleWith`
-  # already keeps `_module` out of the evaluated config, but these attrsets are
-  # forwarded verbatim into mkSdkDriftCheck's named formals, which have no
-  # ellipsis to absorb it if that ever changes.
+  # shape. Dropping nulls is the load-bearing half: the builder merges these
+  # attrs *last*, so an unset `languagePlugin = null` would otherwise land on
+  # top of the shared block's value instead of falling through to it.
+  # `stripModule` is defensive: these attrsets are forwarded verbatim into
+  # mkSdkDriftCheck's named formals, which have no ellipsis to absorb a stray
+  # `_module`.
   cleanSdkDrift =
     sdkDrift:
     let
@@ -229,8 +223,8 @@ in
     }
   );
 
-  # Reads the system off `prev`, not `final`: `final.stdenv` is not yet built
-  # while the overlay list is being applied, so touching it here recurses.
+  # Reads the system off `prev`, not `final`: `final.stdenv` is unbuilt while
+  # the overlay list is being applied, so touching it here recurses.
   config.flake.overlays.pulumiPackages =
     _final: prev:
     withSystem prev.stdenv.hostPlatform.system ({ config, ... }: config.pulumi.overlayAttrs);

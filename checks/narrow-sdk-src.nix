@@ -1,9 +1,8 @@
 # Coverage for lib/narrow-sdk-src.nix, which `examples/` cannot reach: every
 # example leaves `src` at the default `fetchFromGitHub`, an unbuilt derivation
-# that takes the pass-through branch before `root` is ever forced. So the two
-# readable branches - the only ones that do any narrowing - shipped untested,
-# and the string-like one turned out to throw at eval on the very value it was
-# written for. These cases pin all three readable shapes plus the pass-through.
+# that takes the pass-through branch before `root` is ever forced. These cases
+# pin all three readable shapes plus the pass-through, since the two readable
+# branches do the only narrowing that happens.
 {
   lib,
   pkgs,
@@ -41,12 +40,10 @@ let
 
   # Interpolating a path yields a store-path string carrying context, and the
   # copy happens during evaluation, so the tree is on disk by the time `narrow`
-  # calls `builtins.pathExists` on it. That combination is what makes this the
-  # regression guard for the context bug: a derivation would carry context too,
-  # but nothing forces it to be built first, so narrowing would quietly bail
-  # out and the case would assert nothing. Before the fix this one fails at
-  # eval, not at build, with "a string that refers to a store path cannot be
-  # appended to a path".
+  # calls `builtins.pathExists` on it. That combination is the regression guard
+  # for the context bug: a derivation carries context too, but nothing forces
+  # it to be built first, so narrowing would quietly bail out and the case
+  # would assert nothing.
   realizedStorePath = "${builtins.path {
     name = "narrow-sdk-src-fixture";
     path = fixture;

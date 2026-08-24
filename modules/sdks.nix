@@ -1,11 +1,10 @@
 # The `sdks.<lang>` option trees, plus the translation back to the
-# `<lang>Args` convention the builders actually take.
-#
-# Why not just name the options `nodejsArgs`/`goArgs` directly: lib/lang-arg-names.nix
-# selects language SDKs by the *string suffix* `Args` on any top-level key. Every
-# submodule here carries `freeformType = attrsOf raw` as an escape hatch, so a
-# freeform key that happened to end in `Args` would be silently read as a language.
-# Nesting under `sdks` makes the set of languages explicit.
+# `<lang>Args` convention the builders actually take. Not named `nodejsArgs`/
+# `goArgs` directly because lib/lang-arg-names.nix selects language SDKs by the
+# *string suffix* `Args` on any top-level key, and every submodule here carries
+# `freeformType = attrsOf raw` as an escape hatch, so a freeform key ending in
+# `Args` would be silently read as a language. Nesting under `sdks` makes the
+# set of languages explicit.
 { lib }:
 let
   inherit (lib) mkOption types;

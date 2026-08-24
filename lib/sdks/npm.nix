@@ -14,11 +14,11 @@
   version,
   lockFile,
   # Runtime dependencies the output does not carry a copy of. `@pulumi/pulumi`
-  # has to be a singleton in the consuming process - its Node runtime keeps the
-  # resource monitor address and config at module scope - and node and bun both
-  # resolve through the realpath of a symlink, so an SDK carrying its own copy
-  # ends up talking to a different runtime than the program that imported it.
-  # Set to `[ ]` to ship the whole pruned tree.
+  # has to be a singleton in the consuming process, since its Node runtime
+  # keeps the resource monitor address and config at module scope, and node
+  # and bun both resolve through the realpath of a symlink, so an SDK carrying
+  # its own copy talks to a different runtime than the program that imported
+  # it. Set to `[ ]` to ship the whole pruned tree.
   omitDeps ? [ "@pulumi/pulumi" ],
   ...
 }@args:

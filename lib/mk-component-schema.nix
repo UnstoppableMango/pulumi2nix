@@ -1,16 +1,13 @@
 # Extracts schema.json from a source-based, multi-language component provider by
-# shelling out to `pulumi package get-schema`, which runs the source itself rather
-# than a separate `cmd/pulumi-gen-<name>` tool. For nodejs, `get-schema` runs the
-# install itself, so the dependencies have to be resolvable offline by the time
-# `buildPhase` starts: either an npm cache plus a writable package-lock.json
-# (hence the `chmod +w`), or a yarn offline cache that `yarnConfigHook` has
-# unpacked into `node_modules` and that `buildPhase` then re-points yarn at (see
-# the `installEnv` comment - the hook's own `$HOME` does not survive). Which of
-# the two is used follows from the lockfile pair supplied, the same
-# `lockFile`/`npmDepsHash` vs `yarnLockFile`/`yarnDepsHash` split that separates
-# `lib/sdks/npm.nix` from `lib/sdks/yarn.nix`.
-# `providerPlugins` pre-seeds the plugin cache so components that import another
-# provider's SDK don't need network access during the build.
+# shelling out to `pulumi package get-schema`, which runs the source itself
+# rather than a separate `cmd/pulumi-gen-<name>` tool. For nodejs, `get-schema`
+# runs the install itself, so dependencies have to be resolvable offline by the
+# time `buildPhase` starts, via either an npm cache plus a writable
+# package-lock.json or a yarn offline cache; which one applies follows from the
+# lockfile pair supplied, the same split that separates `lib/sdks/npm.nix` from
+# `lib/sdks/yarn.nix`. `providerPlugins` pre-seeds the plugin cache so
+# components that import another provider's SDK don't need network access
+# during the build.
 {
   lib,
   stdenv,
@@ -96,9 +93,9 @@ let
     };
 
     # No yarnBuildHook/yarnInstallHook: this derivation only reads the tree to
-    # answer `GetSchema`, it never packages it. yarnConfigHook alone is what
-    # matters, and it runs in configurePhase, so `node_modules` is populated
-    # from the offline cache before get-schema's own install would look.
+    # answer `GetSchema`, it never packages it. yarnConfigHook alone matters,
+    # since it runs in configurePhase and populates `node_modules` from the
+    # offline cache before get-schema's own install looks for it.
     nativeBuildInputs = [
       nodejs
       yarnConfigHook
@@ -108,22 +105,17 @@ let
   };
 
   # Both branches re-establish offline resolution for the install `get-schema`
-  # runs itself, which is a fresh `yarn install` / `npm install` in the language
-  # host's own process rather than anything the nixpkgs hooks control.
+  # runs itself: a fresh `yarn install` / `npm install` in the language host's
+  # own process, outside the nixpkgs hooks' control. npm reads
+  # `npm_config_offline` straight out of the environment.
   #
-  # npm reads `npm_config_offline` straight out of the environment.
-  #
-  # yarn takes more: observed in the sandbox, a populated `node_modules` is not
-  # enough on its own. `pulumi-language-nodejs` sees the `yarn.lock` and runs a
-  # plain `yarn install`, which re-resolves from the lockfile and goes to
-  # registry.yarnpkg.com (`getaddrinfo EAI_AGAIN`, three attempts, then a hard
-  # failure) unless it can find the offline mirror. What points it there is the
-  # `yarn-offline-mirror` setting yarnConfigHook wrote to `$HOME/.yarnrc`, paired
-  # with the relative `resolved` entries `fixup-yarn-lock` left in `yarn.lock` -
-  # and the hook's `$HOME` is its own `mktemp -d`, which the `HOME=$TMPDIR` the
-  # pulumi CLI needs then discards. So point the new HOME at the same cache. With
-  # that in place the install completes with no network access and no `--offline`
-  # flag (which there is no way to pass anyway) and no `YARN_*` env var.
+  # yarn needs more: a populated `node_modules` alone is not enough, since
+  # `pulumi-language-nodejs` runs a plain `yarn install` that re-resolves from
+  # the lockfile and hits the network unless it finds the offline mirror.
+  # yarnConfigHook wrote the `yarn-offline-mirror` setting to its own `$HOME`,
+  # which the `HOME=$TMPDIR` the pulumi CLI needs then discards, so
+  # re-pointing the new HOME at the same cache lets the install complete
+  # offline with no `YARN_*` env var.
   installEnv =
     if useNpm then
       ''

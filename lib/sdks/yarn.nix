@@ -19,12 +19,11 @@
   version,
   yarnLockFile,
   yarnDepsHash,
-  # As npm.nix's `omitDeps`, with one difference: yarn classic has no real
-  # `prune` (its own `prune` is a stub pointing at `install`), and by the time
-  # yarnInstallHook has run there is nothing left to re-resolve against. So the
-  # named packages are deleted from the installed tree rather than pruned out of
-  # it, and anything that was reachable only through them stays behind. Nothing
-  # resolves to those leftovers; they are just dead weight.
+  # As npm.nix's `omitDeps`, with one difference: yarn classic's own `prune` is
+  # a stub pointing at `install`, and by the time yarnInstallHook has run there
+  # is nothing left to re-resolve against. So the named packages are deleted
+  # from the installed tree rather than pruned out of it; anything reachable
+  # only through them stays behind as dead weight nothing resolves to.
   omitDeps ? [ "@pulumi/pulumi" ],
   ...
 }@args:

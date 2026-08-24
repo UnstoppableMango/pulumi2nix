@@ -1,30 +1,24 @@
-# Fails if a provider's committed `sdk/<lang>` no longer matches what its gen
-# tool emits from the current source.
+# Fails when a provider's committed `sdk/<lang>` doesn't match what its gen
+# tool emits from source. Provider builders read SDK source straight out of
+# the source tree's `sdk/<lang>` (see lib/with-sdks.nix), so a resource change
+# that lands without a regenerated SDK still builds, and `nix flake check`
+# stays green against a stale tree; this closes that loop by re-running the
+# same `cmdGen` binary the provider build already uses into a scratch
+# directory and diffing the result against what is committed.
 #
-# The provider builders read SDK source straight out of the source tree's
-# `sdk/<lang>` (see lib/with-sdks.nix), so a resource change that lands without
-# a regenerated SDK still builds, and `nix flake check` stays green against a
-# stale tree. This closes that loop: it re-runs the same `cmdGen` binary the
-# provider build already uses, into a scratch directory, and diffs the result
-# against what is committed.
+# `pulumiGen` is the already-built gen tool, so the check shares the provider
+# build's derivation instead of paying for a second Go build.
 #
-# `pulumiGen` is the already-built gen tool rather than a rebuild, so the check
-# shares the provider build's derivation instead of paying for a second Go build.
-#
-# That "one more run of an already-built binary" premise only holds for
-# pre-delegation bridges. `pkg/tfgen`'s `emitSDK` used to codegen every language
-# in-process; on a current pulumi-terraform-bridge it routes Golang, NodeJS,
-# Python and CSharp through `runPulumiPackageGenSDK`, which is an
-# `exec.Command("pulumi", "package", "gen-sdk", "--language", <lang>, ...)`. On
-# such a provider the gen tool is a schema producer and a subprocess launcher,
-# and the check needs the `pulumi` CLI plus that language's host on PATH or it
-# dies with `exec: "pulumi": executable file not found in $PATH`.
-#
-# Which era a given provider is on is not something this file can detect - it
-# depends on the bridge version in the provider's own go.mod, which is not
-# readable at eval time. So `languagePlugin` is the caller's declaration of "this
-# provider delegates": passing it adds both tools, omitting it keeps the older,
-# closure-free shape.
+# On a bridge whose `emitSDK` routes Golang, NodeJS, Python and CSharp through
+# `runPulumiPackageGenSDK` (an `exec.Command("pulumi", "package", "gen-sdk",
+# "--language", <lang>, ...)`), the gen tool is a schema producer and a
+# subprocess launcher, so the check also needs the `pulumi` CLI plus that
+# language's host on PATH or it dies with `exec: "pulumi": executable file not
+# found in $PATH`. Whether a given provider's bridge delegates that way is not
+# detectable from this file - it depends on the bridge version in the
+# provider's own go.mod, unreadable at eval time - so `languagePlugin` is the
+# caller's explicit declaration that it does: passing it adds both tools,
+# omitting it keeps the closure-free shape.
 {
   lib,
   stdenv,
