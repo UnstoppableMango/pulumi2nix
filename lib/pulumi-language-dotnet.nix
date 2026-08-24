@@ -10,10 +10,10 @@
 }:
 let
   # The .NET codegen writes a logo.png beside each generated SDK's .csproj, and
-  # upstream's getLogo() downloads it - so `pulumi package gen-sdk --language
-  # dotnet` cannot run in a build sandbox. Fetch it here instead, where nix's
-  # fixed-output fetcher is the one thing allowed network, and patch getLogo()
-  # to read this vendored copy. The URL is upstream's own hardcoded default.
+  # upstream's getLogo() downloads it, so `pulumi package gen-sdk --language
+  # dotnet` cannot run in a build sandbox. Fetch it here instead, with Nix's
+  # fixed-output fetcher as the one thing allowed network, and patch getLogo()
+  # to read this vendored copy of upstream's own hardcoded default URL.
   defaultLogo = fetchurl {
     url = "https://raw.githubusercontent.com/pulumi/pulumi/dbc96206bec722b7791a22ff50e895ab7c0abdc0/sdk/dotnet/pulumi_logo_64x64.png";
     hash = "sha256-XqrP0xs/0mafCNTqALimp4SA9s23lGIcNY9Zyv9TT+k=";

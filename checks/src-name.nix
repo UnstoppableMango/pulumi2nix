@@ -1,12 +1,9 @@
-# Coverage for lib/src-name.nix, the other half of what a caller-supplied `src`
-# has to get right: narrow-sdk-src picks which files reach a build, this picks
-# what `sourceRoot` prefixes them with. A wrong answer is not an eval error but
-# a build one - `chmod: cannot access 'source/provider'` - minutes into a Go
-# build, and only for `src` shapes no example uses, so every shape is pinned
-# here instead.
-#
-# Assertions rather than a build, because `srcName` is a pure string function
-# and reproducing the mismatch for real would mean building a whole provider.
+# Coverage for lib/src-name.nix, which picks what `sourceRoot` prefixes files
+# with (narrow-sdk-src picks which files reach a build). A wrong answer is not
+# an eval error but a build one - `chmod: cannot access 'source/provider'` -
+# minutes into a Go build, and only for `src` shapes no example uses, so every
+# shape is pinned here as assertions instead of a build, since `srcName` is a
+# pure string function.
 {
   lib,
   pkgs,
@@ -15,27 +12,26 @@
 let
   fixture = ./fixtures/provider;
 
-  # The name unpackPhase will actually leave behind, worked out the way stdenv
-  # gets there rather than the way lib/src-name.nix does, so these expectations
-  # are independent of the implementation instead of a restatement of it: taking
-  # a source as a build input copies it into the store under a name Nix derives
-  # from it, and stripHash then drops the leading 32-char hash and its dash.
-  # `builtins.path` performs that same copy and hands back that same name.
+  # The name unpackPhase leaves behind, worked out the way stdenv gets there
+  # rather than the way lib/src-name.nix does, so these expectations are
+  # independent of the implementation: taking a source as a build input copies
+  # it into the store under a name Nix derives from it, and stripHash drops
+  # the leading 32-char hash and its dash. `builtins.path` performs that same
+  # copy and hands back that same name.
   unpacked = src: builtins.substring 33 (-1) (baseNameOf (builtins.path { path = src; }));
 
   # `builtins.path` copies at eval time and hands back a string, so this is a
-  # plain store-path string naming a tree that exists right now.
+  # plain store-path string naming an existing tree.
   storePathString = builtins.path {
     name = "src-name-fixture";
     path = fixture;
   };
 
-  # The same store path as a path value, which is what a checkout already
-  # realized in the store coerces to. Its basename is `<hash>-<name>` before the
-  # copy above puts a second hash in front of it, and that doubling is what makes
-  # it the shape lib/src-name.nix used to get wrong. Built by re-parsing the
-  # string rather than interpolating a path, because interpolating one would copy
-  # it into the store a second time and defeat the point.
+  # The same store path as a path value, matching what an already-realized
+  # checkout coerces to; its double-hashed basename (the copy above adds a
+  # second hash in front of `<hash>-<name>`) is the shape lib/src-name.nix
+  # must handle. Built by re-parsing the string rather than interpolating a
+  # path, since interpolating would copy it into the store a second time.
   storePath = /. + (builtins.unsafeDiscardStringContext storePathString);
 
   # An unbuilt derivation, the shape the default `fetchFromGitHub` produces.
@@ -43,9 +39,9 @@ let
   fetched = pkgs.runCommandLocal "src-name-fixture-fetched" { } "cp -r ${fixture} $out";
 
   cases = {
-    # A fetcher output answers from `.name`, and has to keep doing so: the
-    # store-path reasoning below would be wrong for it, since the fetch has no
-    # output path yet to reason about.
+    # A fetcher output answers from `.name`: the store-path reasoning below
+    # would be wrong for it, since an unbuilt fetch has no output path to
+    # reason about.
     "derivation with .name" = {
       actual = srcName fetched;
       expected = fetched.name;
@@ -64,10 +60,10 @@ let
       expected = "source";
     };
 
-    # The regression guards. Both are path values under the store, so both get
-    # copied in again under their full basename; before the `builtins.isPath`
-    # branch the store-prefix test stripped 33 more characters off names that
-    # had no second hash to give, which for the second case is the whole name.
+    # The regression guards: both are path values under the store, so both get
+    # copied in again under their full basename. Without the `builtins.isPath`
+    # branch, the store-prefix test would strip 33 characters off names that
+    # have no second hash to give, which for the second case is the whole name.
     "path already in the store" = {
       actual = srcName storePath;
       expected = unpacked storePath;

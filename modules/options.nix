@@ -102,11 +102,11 @@ let
               fresh `cmdGen <lang> --out` run, one `checks.<name>-sdk-<lang>-generated`
               each.
 
-              Two shapes, for the two eras of tfgen. A plain list is enough on an
-              older `pulumi-terraform-bridge`, whose `emitSDK` codegens every
-              language in-process and offline. A current bridge instead shells
-              out to `pulumi package gen-sdk --language <lang>`, so those
-              providers pass an attrset and name a `languagePlugin` per language:
+              Two shapes. A plain list is enough when the bridge's `emitSDK`
+              codegens every language in-process and offline. A bridge that
+              instead shells out to `pulumi package gen-sdk --language <lang>`
+              needs those providers to pass an attrset and name a
+              `languagePlugin` per language:
 
               ```nix
               sdkDrift.languages = {
@@ -118,12 +118,12 @@ let
               };
               ```
 
-              Which era a provider is on is left to the caller, deliberately: it
-              follows from the bridge version in the provider's own `go.mod`,
-              which nothing here can read at eval time. Naming a plugin is the
-              declaration. Anything else set per language (`exclude`,
-              `extraExclude`, `sdkPath`) overrides the surrounding block for
-              that language alone.
+              Which shape a provider needs is left to the caller, deliberately:
+              it follows from the bridge version in the provider's own
+              `go.mod`, which nothing here can read at eval time. Naming a
+              plugin is the declaration. Anything else set per language
+              (`exclude`, `extraExclude`, `sdkPath`) overrides the surrounding
+              block for that language alone.
 
               Empty by default: not every provider repo commits an `sdk/` tree,
               and a check with nothing to compare against would only ever fail.

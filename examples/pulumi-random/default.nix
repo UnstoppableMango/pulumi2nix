@@ -18,27 +18,23 @@ in
     # freeformType, the same escape hatch the builders themselves rely on.
     __darwinAllowLocalNetworking = true;
 
-    # Deliberately not enabled here, and the one example that documents why.
+    # Deliberately not enabled here:
     #
     #   sdkDrift.languages = [ "nodejs" ];
     #
-    # would emit `checks.pulumi-random-sdk-nodejs-generated`, and it fails - not
+    # would emit `checks.pulumi-random-sdk-nodejs-generated` and fail, not
     # because upstream's sdk/nodejs is stale, but because tfgen cannot reproduce
     # it in the sandbox. pulumi-random's doc comments come from the vendored
     # `terraform-providers/terraform-provider-random` module's `website/docs`,
-    # and nixpkgs' `go mod vendor` tree keeps only .go files, so every resource
-    # regenerates with "could not find docs for resource ..." and plain-text
-    # descriptions where the committed SDK has upstream's markdown.
+    # which nixpkgs' `go mod vendor` tree drops, so every resource regenerates
+    # with plain-text descriptions instead of upstream's markdown. The check is
+    # exact for providers that own their docs, which `make generate` for a
+    # greenfield bridged provider is nothing but `tfgen <lang> --out sdk/<lang>`.
     #
-    # The check is exact for providers that own their docs - the greenfield
-    # bridged providers issue #53 is about, whose `make generate` is nothing but
-    # `tfgen <lang> --out sdk/<lang>`.
-    #
-    # Note the plain list, not the `{ nodejs.languagePlugin = ...; }` attrset a
-    # provider on a current bridge needs: 4.14.0 vendors a pulumi-terraform-bridge
-    # from before `emitSDK` started shelling out to `pulumi package gen-sdk`, so
-    # its tfgen still codegens in-process and needs no CLI or language host on
-    # PATH. Both spellings stay supported for exactly that reason.
+    # A plain list here, not the `{ nodejs.languagePlugin = ...; }` attrset a
+    # delegating bridge needs: this version's pulumi-terraform-bridge codegens
+    # in-process, so its tfgen needs no CLI or language host on PATH. Both
+    # spellings stay supported for exactly that reason.
 
     meta = {
       description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider";
