@@ -80,12 +80,14 @@
           # genuinely differs, because nixpkgs has no build at all and the
           # example falls back to `pulumi2nix.pulumiLanguageDotnet`.
           #
-          # EXPECTED TO FAIL until pulumipkgs ships the offline-logo patch: its
-          # `pulumi-dotnet` still does an `http.Get` in `getLogo()`
-          # (pulumi-language-dotnet/codegen/gen.go), which the build sandbox
-          # forbids. See TODO.md. It is also 3.112.1 against the 3.110.0 pinned
-          # in lib/pulumi-language-dotnet.nix, so once the logo fix lands this
-          # may additionally need its own `nugetDeps` deps.json.
+          # This is the check the flake was worth writing for. Upstream's
+          # `getLogo()` (pulumi-language-dotnet/codegen/gen.go) downloads
+          # logo.png, which the build sandbox forbids, so codegen only works
+          # against a language host carrying the offline-logo patch. pulumipkgs
+          # now ships its own copy of that patch, and this check is what notices
+          # if a version bump ever drops it. The two builds are not otherwise
+          # interchangeable: pulumipkgs pins 3.112.1 against the 3.110.0 in
+          # lib/pulumi-language-dotnet.nix.
           pulumi.componentPackages.test-component.sdks.dotnet.languagePlugin =
             lib.mkForce pkgs.pulumiPackages.pulumi-dotnet;
 

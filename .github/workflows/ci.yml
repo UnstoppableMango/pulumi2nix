@@ -22,13 +22,13 @@ jobs:
       - run: nix flake check
       - run: nix build .#
 
-  # Builds unmango/pulumipkgs against this working tree. Non-blocking on
-  # purpose: it depends on an external repo's main branch, and it carries one
-  # check that is expected to fail until pulumipkgs ships the offline-logo
-  # patch (see TODO.md). Treat a red run as a signal, not a merge gate.
+  # Builds unmango/pulumipkgs against this working tree, so a change that breaks
+  # the builders pulumipkgs consumes fails here instead of downstream. Blocking,
+  # which means it tracks an external repo's main branch as a merge gate: if
+  # pulumipkgs' own main is broken this job goes red for reasons that have
+  # nothing to do with the PR. Read the failure before assuming it is yours.
   integration:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 

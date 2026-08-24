@@ -13,7 +13,7 @@ check lint:
 
 # Sibling flake, so `nix flake check` above never reaches it. The override is
 # what points it at the working tree instead of the last published release, and
-# --keep-going stops the expected dotnet failure from masking the rest.
+# --keep-going reports every failing check rather than stopping at the first.
 integration:
 	nix flake check ./integration --override-input pulumi2nix . --keep-going
 
