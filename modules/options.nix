@@ -1,4 +1,6 @@
-# The eight `pulumi.*` option trees, one per public builder in lib/default.nix.
+# The eight `pulumi.*` option trees, one per package recipe in lib/default.nix.
+# The artifact builders underneath those recipes are reached through `lib`
+# directly, not through an option tree.
 #
 # Every submodule carries `freeformType = types.attrsOf types.raw`: the builders
 # forward unrecognised args verbatim into buildGoModule/stdenv.mkDerivation, and
@@ -91,7 +93,7 @@ let
             default = [ ];
             description = ''
               tfgen languages whose committed `sdk/<lang>` is compared against a
-              fresh `cmdGen <lang> --out` run, one `checks.<name>-sdk-<lang>-generated`
+              fresh `cmdGen <lang> --out` run, one `checks.<name>-sdk-<lang>-drift`
               each.
 
               Two shapes. A plain list is enough when the bridge's `emitSDK`
@@ -149,9 +151,32 @@ let
     };
   };
 
+  embedding = {
+    embedSchema = mkOption {
+      type = types.nullOr types.bool;
+      default = null;
+      description = ''
+        Plant the built `schema.json` at `schemaPath` before the plugin build,
+        and run `go generate cmd/<cmdRes>/main.go` over it.
+
+        Defaults to true for a bridged provider, whose `generate.go` turns the
+        planted file into the `schema-embed.json` that `main.go` embeds, and
+        false for a native one, where a `pulumi-go-provider` binary serves its
+        schema from Go structs and embeds nothing.
+      '';
+    };
+
+    schemaPath = optional types.str ''
+      Where the plugin build reads `schema.json` from, relative to the repo
+      root. Defaults to `provider/cmd/<cmdRes>/schema.json`, which is where
+      tfgen writes it and where `generate.go` looks for it.
+    '';
+  };
+
   providerBase =
     schemaBase
     // exposeSchema
+    // embedding
     // {
       inherit (goCmds) cmdRes;
 
@@ -182,20 +207,7 @@ in
 
   componentSchemas = tree (common // componentSource // componentSchema);
 
-  nativeProviders = tree (
-    providerBase
-    // {
-      postConfigure = mkOption {
-        type = types.lines;
-        description = ''
-          Required. The inherited terraform-bridge `postConfigure` assumes tfgen's
-          `schema` subcommand; a native gen tool takes an explicit schema.json path
-          plus `--version`, so relying on the default silently runs the wrong
-          command instead of failing.
-        '';
-      };
-    }
-  );
+  nativeProviders = tree providerBase;
 
   terraformBridgeProviders = tree (providerBase // sdkDrift);
 

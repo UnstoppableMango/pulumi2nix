@@ -9,7 +9,7 @@
 # `passthru.sdks.<lang>` are flattened out into `packages.<name>-schema` and
 # `packages.<name>-sdk-<lang>`. Everything is mirrored into `checks`, which is
 # what puts generated SDKs under `nix flake check`, alongside the check-only
-# `checks.<name>-sdk-<lang>-generated` SDK drift checks.
+# `checks.<name>-sdk-<lang>-drift` SDK drift checks.
 {
   lib,
   flake-parts-lib,
@@ -113,7 +113,7 @@ in
 
       driftChecksOf =
         d:
-        lib.concatMapAttrs (lang: check: { "${d.name}-sdk-${lang}-generated" = check; }) (
+        lib.concatMapAttrs (lang: check: { "${d.name}-sdk-${lang}-drift" = check; }) (
           d.drv.passthru.sdkDriftChecks or { }
         );
 

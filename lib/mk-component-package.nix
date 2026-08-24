@@ -1,7 +1,16 @@
+# Composes a component provider package:
+#
+#   mkComponentSchema -> mkComponentPlugin -> withSdks
+#
+# A component provider has no committed `sdk/<lang>` tree, so every SDK is
+# generated from the extracted schema; `generate` is defaulted on rather than
+# left to the caller.
 {
-  stdenv,
+  lib,
+  langArgNames,
+  mkComponentPlugin,
   mkComponentSchema,
-  withGeneratedSdks,
+  withSdks,
 }:
 {
   pname,
@@ -12,7 +21,9 @@
   ...
 }@args:
 let
-  schemaDrv = mkComponentSchema (
+  langNames = langArgNames args;
+
+  schema = mkComponentSchema (
     {
       inherit
         pname
@@ -24,33 +35,36 @@ let
     // schemaArgs
   );
 
-  base = stdenv.mkDerivation {
-    pname = "${pname}-component";
-    inherit version meta src;
+  plugin = mkComponentPlugin (
+    removeAttrs args (
+      langNames
+      ++ [
+        "schemaArgs"
+        "sdks"
+      ]
+    )
+    // {
+      inherit
+        pname
+        version
+        meta
+        src
+        schema
+        ;
+    }
+  );
 
-    dontBuild = true;
-
-    installPhase = ''
-      runHook preInstall
-
-      if [ ! -f PulumiPlugin.yaml ]; then
-        echo "mk-component-package.nix: expected PulumiPlugin.yaml at the component provider root" >&2
-        exit 1
-      fi
-
-      mkdir -p $out
-      cp -r . $out/
-
-      runHook postInstall
-    '';
-
-    passthru.schema = schemaDrv;
-  };
+  langArgs = lib.genAttrs langNames (name: { generate = true; } // args.${name});
 in
-withGeneratedSdks (
-  (removeAttrs args [ "schemaArgs" ])
+withSdks (
+  langArgs
   // {
-    inherit base;
-    schema = schemaDrv;
+    base = plugin;
+    inherit
+      schema
+      pname
+      version
+      meta
+      ;
   }
 )

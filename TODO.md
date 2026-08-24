@@ -10,22 +10,17 @@ It would also make pulumipkgs a hard prerequisite for .NET SDK generation, which
 
 ## Java SDK generation
 
-`lib/mk-generated-sdk.nix` can drive any language `pulumi package gen-sdk` supports, but nixpkgs' `pulumiPackages` has no `pulumi-language-java` to pass as `languagePlugin`, and there's no pinned build for it here the way `lib/pulumi-language-dotnet.nix` fills the .NET gap.
+`lib/mk-sdk-source.nix` can drive any language `pulumi package gen-sdk` supports, but nixpkgs' `pulumiPackages` has no `pulumi-language-java` to pass as `languagePlugin`, and there's no pinned build for it here the way `lib/pulumi-language-dotnet.nix` fills the .NET gap.
 Closing this means packaging `pulumi/pulumi-java`'s language host, then registering a `java` entry in `lib/sdks/default.nix`.
 
-## Python SDKs for component providers
-
-`lib/with-generated-sdks.nix` throws on `pythonArgs`: only the languages registered in `lib/sdks` (nodejs, yarnNodejs, go, dotnet) are available for source-based component providers.
-`mkPulumiPackage`/`mkTerraformBridgeProvider` don't have this gap - they delegate python to nixpkgs' upstream builder, which `mk-terraform-bridge-provider.nix` points at `mkGeneratedSdk` output when `sdks.python.generate` is set, sidestepping `with-generated-sdks.nix` entirely.
-Registering that path in `lib/sdks` would close this properly, but a component provider's python SDK also needs the version/`pkg_resources` patching `mkPythonPackage` carries, which currently lives in the bridge builder rather than in a reusable SDK builder.
-The flake module mirrors this: `pulumi.componentPackages.<name>.sdks` has no `python` option, while `pulumi.nativeProviders`/`terraformBridgeProviders` do.
-
-## Generated bridged SDKs do not get tfgen's language overlays
+## Generated SDKs do not get tfgen's language overlays
 
 `sdks.<lang>.generate = true` (see the README) codegens a bridged provider's SDK from its schema with `pulumi package gen-sdk`, which is the same command a current tfgen delegates to, but it is only the codegen step.
 tfgen's per-language overlays - `info.JavaScript.Overlay`, `info.Golang.Overlay` and friends, the hand-written files a provider's `resources.go` splices into its SDKs around codegen - are not represented in the schema, so nothing downstream of it can replay them.
 A provider that ships overlays gets an SDK that silently lacks them, and has to keep its committed `sdk/` tree with an `sdkDrift` check instead.
-Closing this means running the provider's own `cmdGen <lang>` as the generator rather than `gen-sdk`, which is a second generator to build and maintain, and on a delegating bridge needs the `pulumi` CLI and the language plugin anyway.
+
+`lib/mk-sdk-source.nix`'s `genTool` producer is that other generator, and the drift check already uses it, so the remaining work is to let `sdks.<lang>` select it as the *build* source too rather than only as the comparison side.
+What stops that being a plain flag is cost: on a delegating bridge the gen tool needs the `pulumi` CLI and the language plugin anyway, so a provider would pay for both routes to find out which one it is on.
 
 ## No example exercises `sdkDrift.languages` in its attrset form
 
@@ -33,6 +28,7 @@ Closing this means running the provider's own `cmdGen <lang>` as the generator r
 Only the list form appears in `examples/`, and only as a comment: `examples/pulumi-random` pins 4.14.0, whose bundled bridge still codegens in-process.
 Covering the attrset form end to end means a full Go build of a provider on a current bridge, which no example here does, so both shapes are currently verified by evaluation only - that the option type accepts each and that the plugin reaches `nativeBuildInputs`.
 Whether the generator actually runs under a delegating tfgen has been confirmed only against the downstream consumer in issue #61, not in this repo's CI.
+Its two halves are covered separately, though: `checks.sdk-drift` diffs fixture trees through `mkSdkDriftCheck`, and `checks.sdk-source-gen-tool` runs a real pre-delegation `cmdGen <lang> --out` through `mkSdkSource`.
 
 ## Drift checks against providers that vendor their docs
 

@@ -15,18 +15,29 @@ For what a provider *is* and how one is written, see Pulumi's [Build a Provider]
 - [docs/architecture.md](docs/architecture.md) - the artifact graph, the builder graph, and where the two disagree.
 - [`examples/`](examples) - a buildable flake per builder.
 
-| Builder | Builds |
+One builder per artifact:
+
+| Artifact builder | Builds |
 | --- | --- |
-| [`mkSchema`](docs/usage.md#mkschema) | `schema.json` from an explicit gen-tool invocation (generic base) |
-| [`mkPulumiSchema`](docs/usage.md#mkpulumischema) | `schema.json` via a native `cmd/pulumi-gen-<name>` |
-| [`mkTerraformBridgeSchema`](docs/usage.md#mkterraformbridgeschema) | `schema.json` via `tfgen`'s `schema` language |
+| [`mkGenTool`](docs/usage.md#mkgentool) | the repo's `cmd/pulumi-{tf,}gen-<name>` binary |
+| [`mkSchema`](docs/usage.md#mkschema) | `schema.json`, by running that gen tool |
 | [`mkComponentSchema`](docs/usage.md#mkcomponentschema) | `schema.json` from component source via [`pulumi package get-schema`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_get-schema/) |
-| [`mkPulumiPackage`](docs/usage.md#mkpulumipackage) | native `pulumi-resource-<name>` binary + SDKs |
-| [`mkTerraformBridgeProvider`](docs/usage.md#mkterraformbridgeprovider) | bridged `pulumi-resource-<name>` binary + SDKs |
-| [`mkDynamicBridgeProvider`](docs/usage.md#mkdynamicbridgeprovider) | generic `pulumi-resource-terraform-provider` binary |
-| [`mkComponentPackage`](docs/usage.md#mkcomponentpackage) | component source tree + generated SDKs |
-| [`mkGeneratedSdk`](docs/usage.md#mkgeneratedsdk) / [`mkGeneratedGoSdk`](docs/usage.md#mkgeneratedgosdk) | one SDK from a `schema.json`, via [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) |
-| [`pulumiLanguageDotnet`](docs/usage.md#pulumilanguagedotnet) | pinned [`pulumi-language-dotnet`](https://github.com/pulumi/pulumi-dotnet) host (not a builder) |
+| [`mkProviderPlugin`](docs/usage.md#mkproviderplugin) | the `pulumi-resource-<name>` binary, native or bridged |
+| [`mkComponentPlugin`](docs/usage.md#mkcomponentplugin) | a component's source tree + `PulumiPlugin.yaml` |
+| [`mkDynamicPlugin`](docs/usage.md#mkdynamicplugin) | the generic `pulumi-resource-terraform-provider` binary |
+| [`mkSdkSource`](docs/usage.md#mksdksource) | one SDK source tree, committed or generated |
+| [`mkSdk`](docs/usage.md#mksdk) | one packaged SDK |
+
+And recipes that compose them:
+
+| Recipe | Builds |
+| --- | --- |
+| [`mkPulumiPackage`](docs/usage.md#mkpulumipackage) | native provider: gen tool, schema, binary, SDKs |
+| [`mkTerraformBridgeProvider`](docs/usage.md#mkterraformbridgeprovider) | the same, bridged from Terraform ahead of time |
+| [`mkComponentPackage`](docs/usage.md#mkcomponentpackage) | component provider: schema, plugin tree, generated SDKs |
+| [`mkDynamicBridgeProvider`](docs/usage.md#mkdynamicbridgeprovider) | the dynamic bridge, which has no schema and no SDKs |
+
+Plus `mkPulumiSchema` / `mkTerraformBridgeSchema` (schema-command presets), [`withSdks`](docs/usage.md#withsdks), [`mkSdkDriftCheck`](docs/usage.md#mksdkdriftcheck), and [`pulumiLanguageDotnet`](docs/usage.md#pulumilanguagedotnet), a pinned [`pulumi-language-dotnet`](https://github.com/pulumi/pulumi-dotnet) host.
 
 SDK codegen covers Node.js, Python, Go, and .NET. Java is not supported.
 
@@ -57,6 +68,7 @@ Declare a provider with the [flake-parts](https://flake.parts) module, which wir
             lockFile = ./package-lock.json;
             npmDepsHash = "sha256-...";
           };
+          sdks.python = { };
         };
       };
     };
@@ -159,18 +171,21 @@ mkComponentPackage {
 }
 ```
 
-[`mkGeneratedSdk`](docs/usage.md#mkgeneratedsdk), one SDK from any schema derivation:
+[`mkSdkSource`](docs/usage.md#mksdksource), one SDK's source tree from any schema derivation:
 
 ```nix
-{ mkGeneratedSdk, pulumiPackages }:
-mkGeneratedSdk {
+{ mkSdkSource, mkComponentSchema, pulumiPackages }:
+mkSdkSource {
   pname = "test-component";
   version = "0.0.1";
-  schema = mkComponentSchema { /* ... */ };
   lang = "nodejs";
+  schema = mkComponentSchema { /* ... */ };
   languagePlugin = pulumiPackages.pulumi-nodejs;
 }
 ```
+
+Pass `src` instead of `schema` for the repo's committed `sdk/<lang>`, or `genTool` to have the provider's own gen tool emit it.
+[`mkSdk`](docs/usage.md#mksdk) turns any of those into a packaged SDK.
 
 ## Development
 

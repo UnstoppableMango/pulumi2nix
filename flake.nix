@@ -63,6 +63,30 @@
               inherit (config.pulumi.lib) srcName;
             };
 
+            deprecated-aliases = import ./checks/deprecated-aliases.nix {
+              inherit lib pkgs;
+              p2n = config.pulumi.lib;
+            };
+
+            sdk-drift = import ./checks/sdk-drift.nix {
+              inherit pkgs;
+              inherit (config.pulumi.lib) mkSdkDriftCheck;
+            };
+
+            # mkSdkSource's gen tool producer, the one route no example builds:
+            # a bridged provider's tfgen emitting an SDK directly, overlays and
+            # all. It is the generator side of every drift check.
+            sdk-source-gen-tool =
+              let
+                provider = config.packages.pulumi-random;
+              in
+              config.pulumi.lib.mkSdkSource {
+                lang = "nodejs";
+                pname = "pulumi-random";
+                inherit (provider) version src;
+                inherit (provider.passthru) genTool;
+              };
+
             sdk-omit-deps = pkgs.runCommandLocal "sdk-omit-deps" { } ''
               pkg=${config.packages.pulumi-command-sdk-nodejs}/lib/node_modules/@pulumi/command
               test -f "$pkg/index.js"

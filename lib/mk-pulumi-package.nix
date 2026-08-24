@@ -1,24 +1,16 @@
-{
-  lib,
-  mkTerraformBridgeProvider,
-  mkPulumiSchema,
-}:
+# A native provider: schema from `cmd/pulumi-gen-<name>`, which takes an
+# explicit output path and a `--version` flag.
+#
+# The plugin binary gets no schema planted. A `pulumi-go-provider` provider
+# serves its schema from Go structs at runtime and embeds nothing, which is why
+# this preset needs no `postConfigure` of its own. A native provider that *does*
+# embed one can set `embedSchema = true` (plus `schemaPath` where it differs
+# from `provider/cmd/<cmdRes>/schema.json`).
+{ mkProviderPackage }:
 args:
-lib.throwIfNot (args ? postConfigure)
-  ''
-    mkPulumiPackage: `postConfigure` must be supplied. mkPulumiPackage wraps
-    nixpkgs' terraform-bridge provider builder, whose built-in postConfigure
-    default assumes the tfgen convention (`$cmdGen schema; go generate
-    cmd/$cmdRes/main.go`). Native providers' gen tools take a different
-    invocation (an explicit schema.json path + --version flag, not a
-    "schema" subcommand) - relying on the default silently runs the wrong
-    schema-gen command instead of failing. Pass your own postConfigure (see
-    examples/pulumi-command/default.nix).
-  ''
-  (
-    (mkTerraformBridgeProvider args).overrideAttrs (old: {
-      passthru = old.passthru // {
-        schema = mkPulumiSchema args;
-      };
-    })
-  )
+mkProviderPackage (
+  {
+    schemaCommand = "${args.cmdGen} schema.json --version ${args.version}";
+  }
+  // args
+)
