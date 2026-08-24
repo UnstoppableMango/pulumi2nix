@@ -66,13 +66,13 @@ let
     p:
     if lib.isDerivation p then
       {
-        name =
-          lib.removePrefix "pulumi-resource-"
-            (p.meta.mainProgram or (throw ''
-              mk-component-schema: providerPlugins package '${p.name}' has no
-              `meta.mainProgram` set, so its plugin name can't be derived. Pass the
-              explicit { name, version, plugin } form instead.
-            ''));
+        name = lib.removePrefix "pulumi-resource-" (
+          p.meta.mainProgram or (throw ''
+            mk-component-schema: providerPlugins package '${p.name}' has no
+            `meta.mainProgram` set, so its plugin name can't be derived. Pass the
+            explicit { name, version, plugin } form instead.
+          '')
+        );
         version = p.version;
         plugin = "${p}/bin";
       }
