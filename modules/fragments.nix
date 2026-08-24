@@ -124,16 +124,33 @@ rec {
     '';
   };
 
-  # `pulumi package get-schema` needs a language host plus an offline npm cache.
+  # `pulumi package get-schema` needs a language host plus an offline dependency
+  # cache. It runs the nodejs install itself and picks its package manager from
+  # the lockfile in the tree, so which pair is given is what selects npm or yarn
+  # classic - the same split that separates `sdks.nodejs` from `sdks.yarnNodejs`.
+  # Both pairs are `optional` here because neither is required on its own;
+  # mkComponentSchema throws unless exactly one complete pair is supplied.
   componentSchema = {
     languagePlugin = required types.package ''
       The `pulumi-language-<runtime>` host that serves the component's
       `GetSchema` RPC, e.g. `pkgs.pulumiPackages.pulumi-nodejs`.
     '';
 
-    lockFile = required types.raw "The component's own `package-lock.json`.";
+    lockFile = optional types.raw ''
+      The component's own `package-lock.json`, selecting the npm path. Paired
+      with `npmDepsHash`; exactly one of that pair and the
+      `yarnLockFile`/`yarnDepsHash` pair is required.
+    '';
 
-    npmDepsHash = required types.str "Hash of the component's npm dependencies.";
+    npmDepsHash = optional types.str "Hash of the component's npm dependencies.";
+
+    yarnLockFile = optional types.raw ''
+      The component's own `yarn.lock`, selecting the yarn classic path instead
+      of npm, for components whose `yarn.lock` cannot be converted losslessly.
+      Paired with `yarnDepsHash`.
+    '';
+
+    yarnDepsHash = optional types.str "Hash of the component's yarn dependencies.";
 
     sourceRoot = optional types.str "Subdirectory of `src` holding `PulumiPlugin.yaml`.";
 
