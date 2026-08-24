@@ -585,6 +585,7 @@ mkComponentSchema {
   languagePlugin = pulumiPackages.pulumi-nodejs;
   lockFile = ./package-lock.json;
   npmDepsHash = "sha256-...";
+  # Or, for a yarn classic tree, `yarnLockFile` + `yarnDepsHash` instead.
   # Optional: seed the plugin cache for components that import another
   # provider's SDK (e.g. @pulumi/github), since get-schema otherwise
   # tries to download that provider's resource plugin with no network
@@ -599,6 +600,17 @@ mkComponentSchema {
   meta.license = lib.licenses.asl20;
 }
 ```
+
+**npm or yarn classic.**
+`get-schema` runs the nodejs install itself and picks its package manager from the lockfile it finds in the tree, so which lockfile pair is passed is what selects the dependency path, the same way `sdks.nodejs` and `sdks.yarnNodejs` are distinguished one layer down:
+
+- `lockFile` + `npmDepsHash`: the component's `package-lock.json`, fetched with `fetchNpmDeps`.
+- `yarnLockFile` + `yarnDepsHash`: the component's `yarn.lock`, fetched with `fetchYarnDeps` and unpacked by `yarnConfigHook`, for a tree whose `yarn.lock` cannot be converted to a `package-lock.json` losslessly.
+
+Exactly one complete pair is required; passing both or neither is an error.
+See [`examples/test-component-yarn`](examples/test-component-yarn) for the yarn side.
+
+Discover the hash the same way either way: set it to `lib.fakeHash` and read the real value out of the first build failure.
 
 **Component class shape.**
 `pulumi package get-schema`'s analyzer only recognizes classes that extend `ComponentResource` directly - it walks one heritage-clause level and checks the resolved symbol against `resource.ts`/`resource.d.ts`.
@@ -639,7 +651,7 @@ Then set `vendorHash = lib.fakeHash` and read the real hash out of the first bui
 ### `mkComponentPackage`
 
 Packages a source-based component provider and layers generated SDKs on top of its extracted schema, since this provider shape has no compiled resource binary to build.
-See [`examples/test-component`](examples/test-component).
+See [`examples/test-component`](examples/test-component), or [`examples/test-component-yarn`](examples/test-component-yarn) for the same thing with a yarn classic source tree.
 
 ```nix
 { lib, mkComponentPackage, pulumiPackages, pulumiLanguageDotnet }:
@@ -649,6 +661,10 @@ mkComponentPackage {
   src = ./.;
   schemaArgs = {
     languagePlugin = pulumiPackages.pulumi-nodejs;
+    # npm, or `yarnLockFile` + `yarnDepsHash` for a yarn classic tree - see
+    # mkComponentSchema's "npm or yarn classic" above. Independent of what the
+    # generated SDKs below use, whose source is codegen output with its own
+    # dependency set.
     lockFile = ./package-lock.json;
     npmDepsHash = "sha256-...";
   };
