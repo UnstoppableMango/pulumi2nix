@@ -156,6 +156,10 @@ mkProviderPackage rec {
 }
 ```
 
+A `postConfigure` of your own is forwarded to the plugin build, and so is `nativeBuildInputs`.
+The gen tool is not among them: a hook that runs it in place has to ask for it, with `nativeBuildInputs = [ (mkGenTool { /* ... */ }) ]`.
+Prefer `embedSchema`, which plants the already-built `schema.json` instead of generating a second copy.
+
 ### `mkComponentPackage`
 
 Packages a component provider and layers generated SDKs on its extracted schema, since this shape has no compiled resource binary.
@@ -346,6 +350,7 @@ mkProviderPlugin rec {
 `schema` is planted at `schemaPath` before the build and `go generate cmd/<cmdRes>/main.go` is run over it, which is how a bridged provider ends up embedding it.
 Leave `schema` unset for a provider that carries no schema in its binary; then no gen tool is involved in the plugin build at all.
 Anything else is forwarded to `buildGoModule`, and a `postConfigure` of your own is appended after the schema and `go generate` steps rather than replacing them.
+A hook needing tools of its own takes them through `nativeBuildInputs` like any other `buildGoModule` call, the gen tool included.
 
 ### `mkComponentPlugin`
 
