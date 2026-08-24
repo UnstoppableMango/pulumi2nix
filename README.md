@@ -33,6 +33,146 @@ Every builder above separates schema extraction from binary packaging, so `schem
 `mkGeneratedSdk` runs `pulumi package gen-sdk` against a `schema.json` output using the target language's `pulumi-language-<lang>` plugin, covering Node.js, Python, and Go from nixpkgs' `pulumiPackages`, and .NET via this repo's own pinned `pulumi-language-dotnet` build (upstream `pulumi/pulumi-dotnet` has no packaged language host in nixpkgs). Java is not supported.
 Go additionally goes through `mkGeneratedGoSdk`, which attaches the `go.mod`/`go.sum` pair that `gen-sdk` never emits.
 
+## How it fits together
+
+### Pulumi's artifacts
+
+Every Pulumi provider, whatever it is generated from, converges on one artifact: `schema.json`.
+The plugin binary and every language SDK are downstream of it, which is why each builder here separates schema extraction from packaging.
+
+```mermaid
+flowchart TD
+  tfsrc["Upstream Terraform provider<br/>+ provider/resources.go"]
+  gosrc["Provider Go source<br/>cmd/pulumi-gen-&lt;name&gt;"]
+  apisrc["OpenAPI / CloudFormation<br/>resource definitions"]
+  compsrc["Component source tree<br/>+ PulumiPlugin.yaml"]
+  dynsrc["pulumi-terraform-bridge<br/>dynamic/"]
+
+  tfgen["pulumi-tfgen-&lt;name&gt;<br/>gen tool binary"]
+  nativegen["pulumi-gen-&lt;name&gt;<br/>gen tool binary"]
+  gethost["pulumi package get-schema<br/>via pulumi-language-&lt;runtime&gt;"]
+
+  schema["schema.json"]
+
+  res["pulumi-resource-&lt;name&gt;<br/>plugin binary"]
+  comppkg["Component plugin<br/>source tree + PulumiPlugin.yaml"]
+  dyn["pulumi-resource-terraform-provider<br/>generic, parameterized at runtime"]
+
+  gensdk["pulumi package gen-sdk<br/>via pulumi-language-&lt;lang&gt;"]
+  sdk["Language SDKs<br/>nodejs / python / go / dotnet"]
+
+  cache["Plugin cache<br/>~/.pulumi/plugins"]
+  prog["Your Pulumi program"]
+  stack["Stack state"]
+
+  tfsrc --> tfgen --> schema
+  gosrc --> nativegen --> schema
+  apisrc --> nativegen
+  compsrc --> gethost --> schema
+  compsrc --> comppkg
+
+  schema --> res
+  schema --> gensdk --> sdk
+
+  dynsrc --> dyn
+  dyn -. "parameterize:<br/>pulumi package add terraform-provider …" .-> schema
+
+  res --> cache
+  comppkg --> cache
+  dyn --> cache
+  sdk --> prog
+  cache --> prog
+  prog --> stack
+
+  classDef p2n stroke:#5277C3,stroke-width:3px
+  class tfgen,nativegen,gethost,schema,res,comppkg,dyn,gensdk,sdk p2n
+
+  linkStyle default stroke-width:1.5px
+```
+
+Thick-bordered nodes are the artifacts pulumi2nix builds.
+Note the two routes into `schema.json`: a *compiled gen tool* for native and ahead-of-time-bridged providers, versus `pulumi package get-schema` launching the component's own language host to serve `GetSchema` straight from source.
+The dynamic bridge is a sibling rather than a child of that chain, since it takes its Terraform provider at runtime instead of being generated against one ahead of time.
+A component package has no compiled resource binary at all: the source tree plus its `PulumiPlugin.yaml` *is* the plugin.
+
+### The builders
+
+Every builder below is reachable from `pulumi2nix.lib`, `overlays.default`, or the flake module.
+Arrows read "is built from".
+
+```mermaid
+flowchart LR
+  subgraph entry["Package builders"]
+    mkPulumiPackage["mkPulumiPackage<br/><i>native provider</i>"]
+    mkTerraformBridgeProvider["mkTerraformBridgeProvider<br/><i>bridged provider</i>"]
+    mkDynamicBridgeProvider["mkDynamicBridgeProvider<br/><i>dynamic bridge</i>"]
+    mkComponentPackage["mkComponentPackage<br/><i>component provider</i>"]
+  end
+
+  subgraph schemas["Schema builders"]
+    mkPulumiSchema["mkPulumiSchema"]
+    mkTerraformBridgeSchema["mkTerraformBridgeSchema"]
+    mkSchema["mkSchema<br/><i>generic base</i>"]
+    mkComponentSchema["mkComponentSchema"]
+  end
+
+  subgraph layering["SDK layering"]
+    withSdks["withSdks<br/><i>committed sdk/&lt;lang&gt;</i>"]
+    withGeneratedSdks["withGeneratedSdks<br/><i>codegen from schema</i>"]
+    mkSdk["mkSdk"]
+    mkGeneratedSdk["mkGeneratedSdk"]
+    mkGeneratedGoSdk["mkGeneratedGoSdk"]
+  end
+
+  subgraph langs["Per-language SDK builders"]
+    npm["sdks/npm.nix"]
+    yarn["sdks/yarn.nix"]
+    go["sdks/go.nix"]
+    dotnet["sdks/dotnet.nix"]
+  end
+
+  mkSdkDriftCheck["mkSdkDriftCheck<br/><i>check-only</i>"]
+  pulumiLanguageDotnet["pulumiLanguageDotnet<br/><i>language host, not a builder</i>"]
+
+  mkPulumiPackage --> mkTerraformBridgeProvider
+  mkPulumiPackage --> mkPulumiSchema
+  mkTerraformBridgeProvider --> mkTerraformBridgeSchema
+  mkTerraformBridgeProvider --> withSdks
+  mkTerraformBridgeProvider --> withGeneratedSdks
+  mkTerraformBridgeProvider --> mkGeneratedSdk
+  mkTerraformBridgeProvider -. "sdkDrift.languages" .-> mkSdkDriftCheck
+  mkComponentPackage --> mkComponentSchema
+  mkComponentPackage --> withGeneratedSdks
+
+  mkPulumiSchema --> mkSchema
+  mkTerraformBridgeSchema --> mkSchema
+
+  withSdks --> mkSdk
+  withGeneratedSdks --> mkSdk
+  withGeneratedSdks --> mkGeneratedSdk
+  withGeneratedSdks --> mkGeneratedGoSdk
+  mkGeneratedGoSdk --> mkGeneratedSdk
+
+  mkSdk --> npm
+  mkSdk --> yarn
+  mkSdk --> go
+  mkSdk --> dotnet
+
+  pulumiLanguageDotnet -. "languagePlugin" .-> mkGeneratedSdk
+  pulumiLanguageDotnet -. "languagePlugin" .-> mkSdkDriftCheck
+
+  linkStyle default stroke-width:1.5px
+```
+
+`mkDynamicBridgeProvider` stands alone: it builds one generic binary, so it has no schema step and no SDKs.
+
+The two layerers differ in where an SDK's *source* comes from.
+`withSdks` reads the tree the upstream repo already commits at `sdk/<lang>`; `withGeneratedSdks` runs codegen against `schema.json` instead.
+`mkTerraformBridgeProvider` chains both, deciding per language from `sdks.<lang>.generate`, so one provider can commit some SDKs and generate others.
+`mkComponentPackage` only ever generates, since a component provider has no committed SDK tree.
+
+Several small helpers are shared by nearly every builder and are left out above to keep the graph readable: `fetchProviderSource` (the default `owner`/`repo`/`rev`/`hash` fetch), `srcName` (resolving `sourceRoot` from any `src`), `narrowSdkSrc` ([narrowed SDK sources](#narrowed-sdk-sources)), `langArgNames` (picking `<lang>Args` out of the caller's arguments), and `attachSdks` (merging built SDKs onto `passthru.sdks` so the two layerers chain rather than overwrite).
+
 ## Usage
 
 There are three entry points, in increasing order of how much plumbing they do for you: the [flake module](#flake-module), the [overlay](#overlay), and `pulumi2nix.lib` with `callPackage`.
