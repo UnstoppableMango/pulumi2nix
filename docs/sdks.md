@@ -111,7 +111,7 @@ pulumi.terraformBridgeProviders.pulumi-foo = {
 ```
 
 That plain list assumes the gen tool emits every language itself, in-process and offline.
-On a current `pulumi-terraform-bridge`, `pkg/tfgen`'s `emitSDK` instead shells out to `pulumi package gen-sdk --language <lang>`, so the check needs the `pulumi` CLI and that language's host on `PATH` or it dies with `exec: "pulumi": executable file not found in $PATH`.
+On a current [`pulumi-terraform-bridge`](https://github.com/pulumi/pulumi-terraform-bridge), [`pkg/tfgen`](https://github.com/pulumi/pulumi-terraform-bridge/tree/master/pkg/tfgen)'s `emitSDK` instead shells out to [`pulumi package gen-sdk --language <lang>`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/), so the check needs the `pulumi` CLI and that language's host on `PATH` or it dies with `exec: "pulumi": executable file not found in $PATH`.
 Say so with an attrset instead of a list:
 
 ```nix
@@ -160,10 +160,10 @@ pulumi.terraformBridgeProviders.pulumi-foo = {
 
 Pick one per language, not both: a generated SDK has no committed counterpart for `sdkDrift` to diff.
 Languages left alone keep building from the repo, so a provider can generate some and commit others.
-This runs the same `pulumi package gen-sdk` that [`mkGeneratedSdk`](../README.md#mkgeneratedsdk) uses, against the schema `checks.<name>-schema` already builds, so each language needs its own `languagePlugin` for the same reason the drift check does.
+This runs the same [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) that [`mkGeneratedSdk`](../README.md#mkgeneratedsdk) uses, against the schema `checks.<name>-schema` already builds, so each language needs its own `languagePlugin` for the same reason the drift check does.
 
 **Limitation: language overlays are not applied.**
-tfgen's per-language overlays (`info.JavaScript.Overlay` and friends, the hand-written files a `resources.go` splices into its SDKs) are not part of the schema, so a provider shipping overlays gets an SDK that silently lacks them.
+tfgen's per-language overlays (`info.JavaScript.Overlay` and friends, the hand-written files a `resources.go` splices into its SDKs) are not part of the [package schema](https://www.pulumi.com/docs/iac/guides/building-extending/packages/schema/), so a provider shipping overlays gets an SDK that silently lacks them.
 That provider should keep its committed tree and guard it with `sdkDrift` instead.
 
 **What still comes from the caller.**

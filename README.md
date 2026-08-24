@@ -7,21 +7,22 @@
 
 Composable Nix builders for Pulumi providers, packages, and language SDKs.
 
-Every provider shape converges on one artifact, `schema.json`, and every builder here separates extracting it from packaging the plugin binary and SDKs downstream of it.
+Every provider shape converges on one artifact, Pulumi's [package schema](https://www.pulumi.com/docs/iac/guides/building-extending/packages/schema/), and every builder here separates extracting it from packaging the plugin binary and SDKs downstream of it.
 See [docs/architecture.md](docs/architecture.md) for the artifact graph, the builder graph, and where the two disagree.
+For what a provider *is* and how one is written, see Pulumi's [Build a Provider](https://www.pulumi.com/docs/iac/guides/building-extending/providers/build-a-provider/) guide; this repo only packages the result.
 
 | Builder | Builds |
 | --- | --- |
 | [`mkSchema`](#mkschema) | `schema.json` from an explicit gen-tool invocation (generic base) |
 | [`mkPulumiSchema`](#mkpulumischema) | `schema.json` via a native `cmd/pulumi-gen-<name>` |
 | [`mkTerraformBridgeSchema`](#mkterraformbridgeschema) | `schema.json` via `tfgen`'s `schema` language |
-| [`mkComponentSchema`](#mkcomponentschema) | `schema.json` from component source via `pulumi package get-schema` |
+| [`mkComponentSchema`](#mkcomponentschema) | `schema.json` from component source via [`pulumi package get-schema`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_get-schema/) |
 | [`mkPulumiPackage`](#mkpulumipackage) | native `pulumi-resource-<name>` binary + SDKs |
 | [`mkTerraformBridgeProvider`](#mkterraformbridgeprovider) | bridged `pulumi-resource-<name>` binary + SDKs |
 | [`mkDynamicBridgeProvider`](#mkdynamicbridgeprovider) | generic `pulumi-resource-terraform-provider` binary |
 | [`mkComponentPackage`](#mkcomponentpackage) | component source tree + generated SDKs |
-| [`mkGeneratedSdk`](#mkgeneratedsdk) / [`mkGeneratedGoSdk`](#mkgeneratedgosdk) | one SDK from a `schema.json`, via `pulumi package gen-sdk` |
-| [`pulumiLanguageDotnet`](#pulumilanguagedotnet) | pinned `pulumi-language-dotnet` host (not a builder) |
+| [`mkGeneratedSdk`](#mkgeneratedsdk) / [`mkGeneratedGoSdk`](#mkgeneratedgosdk) | one SDK from a `schema.json`, via [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) |
+| [`pulumiLanguageDotnet`](#pulumilanguagedotnet) | pinned [`pulumi-language-dotnet`](https://github.com/pulumi/pulumi-dotnet) host (not a builder) |
 
 SDK codegen covers Node.js, Python, Go, and .NET. Java is not supported.
 
@@ -167,7 +168,7 @@ mkPulumiPackage rec {
 
 ### `mkTerraformBridgeSchema`
 
-`schema.json` derived from an upstream Terraform provider by driving `tfgen`'s `schema` language.
+`schema.json` derived from an upstream Terraform provider by driving [`pkg/tfgen`](https://github.com/pulumi/pulumi-terraform-bridge/tree/master/pkg/tfgen)'s `schema` language.
 See [`examples/pulumi-random-schema`](examples/pulumi-random-schema).
 
 ```nix
@@ -214,8 +215,8 @@ It also takes [`sdkDrift`](docs/sdks.md#sdk-drift-checks) and a per-language [`g
 
 ### `mkDynamicBridgeProvider`
 
-The generic `pulumi-resource-terraform-provider` binary, which bridges any Terraform provider at runtime via `pulumi package add terraform-provider ...` instead of being generated ahead of time for one.
-`owner`/`repo` default to `pulumi`/`pulumi-terraform-bridge`, where the `dynamic` package actually lives.
+The generic binary behind Pulumi's [`terraform-provider`](https://www.pulumi.com/registry/packages/terraform-provider/) package, which bridges any Terraform provider at runtime via [`pulumi package add terraform-provider ...`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_add/) instead of being generated ahead of time for one.
+`owner`/`repo` default to `pulumi`/`pulumi-terraform-bridge`, where the [`dynamic`](https://github.com/pulumi/pulumi-terraform-bridge/tree/master/dynamic) package actually lives.
 See [`examples/pulumi-terraform-provider`](examples/pulumi-terraform-provider).
 
 ```nix
@@ -237,7 +238,7 @@ Without `versionString` the build still succeeds and reports a 40-character SHA;
 
 ### `mkComponentSchema`
 
-`schema.json` extracted from a source-based, multi-language component provider (a directory carrying `PulumiPlugin.yaml`) by shelling out to `pulumi package get-schema`, which runs the component's own source.
+`schema.json` extracted from a source-based, multi-language [component](https://www.pulumi.com/docs/iac/concepts/resources/components/) provider (a directory carrying `PulumiPlugin.yaml`) by shelling out to [`pulumi package get-schema`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_get-schema/), which runs the component's own source.
 See [`examples/test-component-schema`](examples/test-component-schema).
 
 ```nix

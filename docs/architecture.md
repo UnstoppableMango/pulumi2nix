@@ -2,7 +2,7 @@
 
 ## Pulumi's artifacts
 
-Every Pulumi provider, whatever it is generated from, converges on one artifact: `schema.json`.
+Every Pulumi provider, whatever it is generated from, converges on one artifact: a [package schema](https://www.pulumi.com/docs/iac/guides/building-extending/packages/schema/), `schema.json`.
 The plugin binary and every language SDK are downstream of it, which is why each builder here separates schema extraction from packaging.
 
 ```mermaid
@@ -56,9 +56,9 @@ flowchart TD
 ```
 
 Thick-bordered nodes are the artifacts pulumi2nix builds.
-Note the two routes into `schema.json`: a *compiled gen tool* for native and ahead-of-time-bridged providers, versus `pulumi package get-schema` launching the component's own language host to serve `GetSchema` straight from source.
+Note the two routes into `schema.json`: a *compiled gen tool* for native and ahead-of-time-bridged providers, versus [`pulumi package get-schema`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_get-schema/) launching the component's own language host to serve `GetSchema` straight from source.
 The dynamic bridge is a sibling rather than a child of that chain, since it takes its Terraform provider at runtime instead of being generated against one ahead of time.
-A component package has no compiled resource binary at all: the source tree plus its `PulumiPlugin.yaml` *is* the plugin.
+A [component](https://www.pulumi.com/docs/iac/concepts/resources/components/) package has no compiled resource binary at all: the source tree plus its `PulumiPlugin.yaml` *is* the plugin.
 
 ## The builders
 
@@ -155,5 +155,5 @@ The current deviations, and what closing each one takes:
 `withSdks` reading a committed `sdk/<lang>` is the largest departure from the diagram above, where every SDK descends from `schema.json`, and it is the one deviation kept on purpose: upstream repos commit those trees, and tfgen's language overlays cannot be recovered from a schema.
 [`sdks.<lang>.generate`](sdks.md#generated-sdks-for-bridged-providers) is the aligned path for providers that do not need them, and [`sdkDrift`](sdks.md#sdk-drift-checks) is the compensation for those that do.
 
-Two more deviations are upstream's rather than this library's, and cannot be closed here: `mkGeneratedGoSdk` exists only because `gen-sdk` emits no `go.mod`/`go.sum`, and `pulumiLanguageDotnet` is patched to read an offline logo because codegen otherwise reaches the network mid-build.
+Two more deviations are upstream's rather than this library's, and cannot be closed here: `mkGeneratedGoSdk` exists only because [`gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) emits no `go.mod`/`go.sum`, and [`pulumiLanguageDotnet`](https://github.com/pulumi/pulumi-dotnet) is patched to read an offline logo because codegen otherwise reaches the network mid-build.
 The .NET one could at least be narrowed by taking a caller-supplied logo derivation, so a real `logoUrl` can be fetched by hash rather than replaced with the generic icon.
