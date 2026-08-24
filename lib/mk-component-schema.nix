@@ -58,10 +58,37 @@ let
         chmod +w yarn.lock
       '';
 
-  seedProviderPlugins = lib.concatMapStringsSep "\n" (p: ''
-    mkdir -p "$HOME/.pulumi/plugins/resource-${p.name}-v${p.version}"
-    cp -r ${p.plugin}/. "$HOME/.pulumi/plugins/resource-${p.name}-v${p.version}/"
-  '') providerPlugins;
+  # A plain package (e.g. `pkgs.pulumiPackages.github`) is normalized to the
+  # explicit { name, version, plugin } shape by reading its own `version` and
+  # its `meta.mainProgram` (`pulumi-resource-<name>`), which every
+  # `mkTerraformBridgeProvider`/`mkDynamicBridgeProvider` build sets.
+  normalizeProviderPlugin =
+    p:
+    if lib.isDerivation p then
+      {
+        name =
+          lib.removePrefix "pulumi-resource-"
+            (p.meta.mainProgram or (throw ''
+              mk-component-schema: providerPlugins package '${p.name}' has no
+              `meta.mainProgram` set, so its plugin name can't be derived. Pass the
+              explicit { name, version, plugin } form instead.
+            ''));
+        version = p.version;
+        plugin = "${p}/bin";
+      }
+    else
+      p;
+
+  seedProviderPlugins = lib.concatMapStringsSep "\n" (
+    raw:
+    let
+      p = normalizeProviderPlugin raw;
+    in
+    ''
+      mkdir -p "$HOME/.pulumi/plugins/resource-${p.name}-v${p.version}"
+      cp -r ${p.plugin}/. "$HOME/.pulumi/plugins/resource-${p.name}-v${p.version}/"
+    ''
+  ) providerPlugins;
 
   npmAttrs = {
     npmDeps = fetchNpmDeps (
