@@ -89,6 +89,29 @@
               touch $out
             '';
 
+            # Same reasoning as sdk-omit-deps: the build passing is not the
+            # property we care about. `mkDynamicBridgeProvider` compiles a
+            # version into the binary, and a SHA-pinned example builds just as
+            # happily with the wrong string baked in - the breakage only shows
+            # up when the CLI reads the version back.
+            #
+            # Read through the binary's own `--version`, which it answers with
+            # exit 0 before serving any RPC, rather than grepping the object
+            # file: that is the same path `pulumi plugin ls` and plugin-version
+            # resolution take, so it tests the value that actually reaches them.
+            dynamic-bridge-version = pkgs.runCommandLocal "dynamic-bridge-version" { } ''
+              want=v1.1.3
+              got=$(${lib.getExe config.packages.pulumi-terraform-provider} --version)
+
+              if [ "$got" != "$want" ]; then
+                echo "dynamic-bridge-version: binary reports '$got', expected '$want'" >&2
+                echo "(a 40-character SHA here means the version ldflag fell back to \`rev\`)" >&2
+                exit 1
+              fi
+
+              touch $out
+            '';
+
             # Filtered to .nix files so an unrelated README edit doesn't rebuild it.
             nix-lint =
               let

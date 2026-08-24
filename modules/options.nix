@@ -39,6 +39,7 @@ let
     };
 
   inherit (fragments)
+    optional
     common
     upstream
     goCmds
@@ -232,6 +233,18 @@ in
           only hosts releases built from it.
         '';
       };
+
+      versionString = optional types.str ''
+        What the built binary reports as its version, compiled into the
+        `dynamic/version.version` ldflag. Defaults to `rev`.
+
+        A SHA-pinned build needs this: `pulumi/pulumi-terraform-provider` only
+        hosts docs and releases, and one of its releases names the
+        `pulumi-terraform-bridge` *commit* it was generated from rather than a
+        bridge tag. So the release-accurate pin is `rev = "<sha>"` with
+        `versionString = "v1.1.3"`; leaving it unset would make the binary
+        report the 40-character SHA to `pulumi plugin ls`.
+      '';
     }
   );
 
