@@ -21,3 +21,23 @@ jobs:
 
       - run: nix flake check
       - run: nix build .#
+
+  # Builds unmango/pulumipkgs against this working tree, so a change that breaks
+  # the builders pulumipkgs consumes fails here instead of downstream. Blocking,
+  # which means it tracks an external repo's main branch as a merge gate: if
+  # pulumipkgs' own main is broken this job goes red for reasons that have
+  # nothing to do with the PR. Read the failure before assuming it is yours.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+        with:
+          name: unstoppablemango
+
+      - run: nix flake check ./integration --override-input pulumi2nix . --keep-going

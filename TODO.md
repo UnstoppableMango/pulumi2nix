@@ -1,5 +1,13 @@
 # Known Gaps
 
+## `lib/pulumi-language-dotnet.nix` duplicates pulumipkgs' build
+
+This repo pins its own patched `pulumi-language-dotnet` because nixpkgs has no build for it, and `pulumi package gen-sdk --language dotnet` cannot run in a sandbox against an unpatched host.
+unmango/pulumipkgs now carries the same offline-logo patch in `pkgs/languages/pulumi-dotnet`, at 3.112.1 against the 3.110.0 pinned here, and `integration/` proves that build drives codegen successfully.
+So there are two patched copies of one workaround, and only one of them tracks upstream releases.
+Retiring the local copy means dropping `lib/pulumi-language-dotnet.nix` and `lib/patches/pulumi-language-dotnet-offline-logo.patch`, which is a breaking change: `pulumiLanguageDotnet` is public API through both `flake.lib` and `overlays.default`, and `examples/test-component` is its only in-repo consumer.
+It would also make pulumipkgs a hard prerequisite for .NET SDK generation, which is a bigger dependency than this repo currently takes on.
+
 ## Java SDK generation
 
 `lib/mk-generated-sdk.nix` can drive any language `pulumi package gen-sdk` supports, but nixpkgs' `pulumiPackages` has no `pulumi-language-java` to pass as `languagePlugin`, and there's no pinned build for it here the way `lib/pulumi-language-dotnet.nix` fills the .NET gap.

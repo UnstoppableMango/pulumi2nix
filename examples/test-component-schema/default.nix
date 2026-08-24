@@ -6,7 +6,7 @@
   pulumi.componentSchemas.test-component-get-schema = {
     version = "0.0.1";
     src = ./.;
-    languagePlugin = pkgs.pulumiPackages.pulumi-language-nodejs;
+    languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
     lockFile = ./package-lock.json;
     npmDepsHash = "sha256-OJn3at3oJFm1SzJTipit5D+YwBkQpAfFPFK8G+7fMAQ=";
 
