@@ -130,18 +130,26 @@ rec {
 
     providerPlugins = mkOption {
       type = types.listOf (
-        types.submodule {
-          options = {
-            name = required types.str "Provider plugin name, e.g. `github`.";
-            version = required types.str "Provider plugin version.";
-            plugin = required types.raw "Extracted `pulumi-resource-<name>` tree.";
-          };
-        }
+        types.either types.package (
+          types.submodule {
+            options = {
+              name = required types.str "Provider plugin name, e.g. `github`.";
+              version = required types.str "Provider plugin version.";
+              plugin = required types.raw "Extracted `pulumi-resource-<name>` tree.";
+            };
+          }
+        )
       );
       default = [ ];
       description = ''
         Seeds the plugin cache for components importing another provider's SDK,
         which `get-schema` would otherwise try to download with no network.
+
+        A plain package (e.g. `pkgs.pulumiPackages.github`) is enough: its name
+        and version are read off the package itself (`meta.mainProgram`,
+        `version`). Fall back to the explicit `{ name, version, plugin }` form
+        for a plugin that isn't a package built by this repo's builders, or
+        whose `meta.mainProgram` isn't set.
       '';
     };
   };

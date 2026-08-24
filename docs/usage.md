@@ -236,7 +236,15 @@ mkComponentSchema {
 Exactly one complete pair is required; both or neither is an error.
 Discover the hash by setting it to `lib.fakeHash` and reading the real value out of the first build failure.
 
-**Components importing another provider's SDK** need that provider's plugin seeded into the cache, since `get-schema` otherwise tries to download it with no network in the sandbox:
+**Components importing another provider's SDK** need that provider's plugin seeded into the cache, since `get-schema` otherwise tries to download it with no network in the sandbox. A plain package is enough; its name and version are read off `meta.mainProgram` (`pulumi-resource-<name>`) and `version`:
+
+```nix
+providerPlugins = [
+  pkgs.pulumiPackages.github
+];
+```
+
+Fall back to the explicit form for a plugin that isn't a package built by this repo's builders, or whose `meta.mainProgram` isn't set:
 
 ```nix
 providerPlugins = [
