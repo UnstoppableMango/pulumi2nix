@@ -27,7 +27,7 @@
         importBasePath = "github.com/UnstoppableMango/pulumi2nix/examples/test-component-yarn/sdk/go/testcomponentyarn";
         goMod = ./generated-sdk/go/go.mod;
         goSum = ./generated-sdk/go/go.sum;
-        vendorHash = "sha256-KBwE+KOipz+yPcyF6c79ujx20Mm2qVpT3Lhk0hNhv88=";
+        vendorHash = "sha256-i/0ixLhLo/u3nCC2Ecfofm/AYeXthBI4y6t6ISgPnJ4=";
       };
 
       dotnet = {
