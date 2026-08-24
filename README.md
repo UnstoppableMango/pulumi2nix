@@ -150,7 +150,8 @@ mkTerraformBridgeProvider {
 ```
 
 `owner` and `hash` are only forced by the default fetch, so a caller supplying `src` can omit them.
-`repo` is required either way, and `rev` defaults to `v${version}`: both name the derivation, and `mkDynamicBridgeProvider` compiles `rev` into its version ldflag.
+`repo` is required either way, and `rev` defaults to `v${version}`: both name the derivation.
+`mkDynamicBridgeProvider` also compiles a version into its binary, but through its own [`versionString`](#mkdynamicbridgeprovider), which defaults to `rev` and can be set independently when the release tag and the source revision differ.
 Layered SDKs take a lang-qualified derivation name, `<repo>-sdk-<lang>`, matching the flattened `packages.<name>-sdk-<lang>` output, so a provider and its SDKs stay distinguishable in store paths and build logs.
 Set `pname` on the individual `sdks.<lang>` block (or `<lang>Args`) to override it.
 
@@ -523,6 +524,33 @@ mkDynamicBridgeProvider {
   meta.license = lib.licenses.asl20;
 }
 ```
+
+That shape builds a `pulumi-terraform-bridge` tag straight through.
+Building what a `pulumi-terraform-provider` release actually shipped means pinning a commit instead, which is what the linked example does; see `versionString` below.
+
+#### `versionString`
+
+The binary reports a version of its own, compiled into `dynamic/version.version`, and `pulumi plugin ls` and the CLI's plugin-version resolution both read it.
+`versionString` is what goes in there. It defaults to `rev`, which is right whenever the release tag and the source revision are the same string.
+
+For this provider specifically they usually aren't.
+`pulumi/pulumi-terraform-provider` hosts only docs and releases; the code is `pulumi/pulumi-terraform-bridge`'s `dynamic/` directory, and a `pulumi-terraform-provider` release names the bridge *commit* it was generated from rather than a bridge tag.
+So a release-accurate build pins the SHA and names the tag separately:
+
+```nix
+{ lib, mkDynamicBridgeProvider }:
+mkDynamicBridgeProvider {
+  version = "1.1.3"; # names the derivation
+  rev = "484f8987228cbec779e11f593bc48c79c49d4f08"; # the bridge commit the release was built from
+  versionString = "v1.1.3"; # what the binary reports
+  hash = "sha256-...";
+  vendorHash = "sha256-...";
+  meta.license = lib.licenses.asl20;
+}
+```
+
+Without `versionString` that build still succeeds, and produces a binary reporting a 40-character SHA as its version.
+`extraLdflags` can't fix it after the fact: it appends, so it cannot displace the `-X` already in the list, and `go build` taking the last `-X` for a symbol is an accident of ordering rather than a contract.
 
 ### `mkSchema`
 

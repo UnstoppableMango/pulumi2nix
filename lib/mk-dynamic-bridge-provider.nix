@@ -16,12 +16,21 @@
 }:
 # `src` defaults to a fetch of `owner`/`repo`/`rev`/`hash`; pass it to build from
 # a local checkout or a different fetcher. `hash` is only forced by that default,
-# so a caller supplying `src` can omit it. `rev` names the source and feeds
-# the version ldflag either way.
+# so a caller supplying `src` can omit it.
+#
+# `rev` names the source; `versionString` is what the binary reports, and the two
+# are separate because they genuinely differ here. `pulumi/pulumi-terraform-provider`
+# only hosts docs and releases: the code is `pulumi/pulumi-terraform-bridge`'s
+# `dynamic/` directory, and a `pulumi-terraform-provider` release names the bridge
+# *commit* it was generated from rather than a bridge tag. So a release-accurate
+# build is `rev = "<sha>"` with `versionString = "v1.1.3"`. `versionString`
+# defaults to `rev`, which is correct for every caller where the release tag and
+# the source revision are the same string.
 {
   owner ? "pulumi",
   repo ? "pulumi-terraform-bridge",
   rev ? "v${version}",
+  versionString ? rev,
   version,
   hash ? throw "mk-dynamic-bridge-provider.nix: `hash` is required unless `src` is supplied",
   # Passed explicitly rather than as `args`: this builder defaults `owner`/`repo`
@@ -48,6 +57,7 @@ buildGoModule (
     "owner"
     "repo"
     "rev"
+    "versionString"
     "hash"
     "vendorHash"
     "extraLdflags"
@@ -73,7 +83,7 @@ buildGoModule (
       "-X"
       "google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore"
       "-X"
-      "github.com/pulumi/pulumi-terraform-bridge/v3/dynamic/version.version=${rev}"
+      "github.com/pulumi/pulumi-terraform-bridge/v3/dynamic/version.version=${versionString}"
     ]
     ++ extraLdflags;
 
