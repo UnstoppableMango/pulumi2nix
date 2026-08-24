@@ -22,8 +22,6 @@ let
             freeformType = types.attrsOf types.raw;
             inherit options;
 
-            # The attribute name is already the flake output name; don't make
-            # source-based providers repeat it as `pname`.
             config = lib.optionalAttrs (options ? pname) { pname = lib.mkDefault name; };
           }
         )
@@ -47,7 +45,6 @@ let
     componentSchema
     ;
 
-  # Base for the three repo-fetching schema builders.
   schemaBase =
     common
     // upstream
@@ -55,8 +52,6 @@ let
       inherit (goCmds) cmdGen;
     };
 
-  # Suppresses the flattened `packages.<name>-schema`. Its main use is resolving
-  # a collision with a separately declared schema-only build of the same name.
   exposeSchema = {
     exposeSchema = mkOption {
       type = types.nullOr types.bool;
@@ -68,9 +63,6 @@ let
     };
   };
 
-  # A bridged provider's gen tool can regenerate its own `sdk/<lang>`, so the
-  # committed tree can be checked against a fresh run. Nothing else does: the
-  # SDK builds consume whatever is committed, stale or not.
   sdkDriftLanguage = types.submodule {
     freeformType = types.attrsOf types.raw;
 
@@ -157,8 +149,6 @@ let
     };
   };
 
-  # Base for the two repo-fetching provider builders. `cmdRes` and checked-in
-  # SDK layering are what separate these from schemaBase.
   providerBase =
     schemaBase
     // exposeSchema
@@ -172,8 +162,6 @@ let
     };
 in
 {
-  # -- schema-only builders ------------------------------------------------
-
   schemas = tree (
     schemaBase
     // {
@@ -193,8 +181,6 @@ in
   terraformBridgeSchemas = tree schemaBase;
 
   componentSchemas = tree (common // componentSource // componentSchema);
-
-  # -- package builders ----------------------------------------------------
 
   nativeProviders = tree (
     providerBase

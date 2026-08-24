@@ -1,11 +1,3 @@
-# The default `src` fetch shared by every builder that starts from a Pulumi
-# provider repo. Kept in one place so the derivation name, the `v${version}`
-# rev convention, and the missing-arg errors stay identical across builders;
-# `caller` only names the file those errors come from.
-#
-# Only `or`-guarded lookups are used, so this stays callable from a formal's
-# default expression, where the `@args` binding sees just the caller's raw
-# attrset and none of the defaults.
 { fetchFromGitHub }:
 caller: args:
 let

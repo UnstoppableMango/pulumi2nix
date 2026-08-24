@@ -4,8 +4,6 @@ let
   version = "4.14.0";
 in
 {
-  # Named for its mechanism rather than `pulumi-random-schema`, which the
-  # pulumi-random provider already claims via its flattened `passthru.schema`.
   pulumi.terraformBridgeSchemas.pulumi-random-tfgen-schema = {
     inherit repo version;
 

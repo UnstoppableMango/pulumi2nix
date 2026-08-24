@@ -9,11 +9,6 @@
     version = "0.0.1";
     src = ./.;
 
-    # The yarn-classic counterpart to examples/test-component: same component
-    # shape, but the provider's own tree is resolved from a `yarn.lock` rather
-    # than a `package-lock.json`. Only `schemaArgs` differs; the generated SDKs
-    # are ordinary npm/go/dotnet builds either way, since their source is
-    # codegen output with its own dependency set.
     schemaArgs = {
       languagePlugin = pkgs.pulumiPackages.pulumi-nodejs;
       yarnLockFile = ./yarn.lock;

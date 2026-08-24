@@ -1,13 +1,3 @@
-# Completes `mkGeneratedSdk`'s go output into a consumable module tree.
-# `pulumi package gen-sdk --language go` emits only `.go` sources, never
-# `go.mod`/`go.sum`, since populating a `require` block needs a real
-# `go mod tidy` against the network, which a sandboxed derivation can't do. So
-# the caller supplies both files, the same way `nodejsArgs` takes a
-# `package-lock.json` and `dotnetArgs` a `deps.json`; see the README for how
-# to regenerate them.
-#
-# The output name matters: `lib/sdks/go.nix` derives its `sourceRoot` from it
-# via `srcName`.
 {
   stdenv,
 }:

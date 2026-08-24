@@ -4,16 +4,6 @@
   fetchProviderSource,
   srcName,
 }:
-# Builds only a provider's generated `schema.json`, skipping the resource
-# provider binary and any SDKs. `schemaCommand` is the gen tool invocation
-# that leaves a `schema.json` in the invocation's cwd; callers normally get one
-# supplied by mkTerraformBridgeSchema or mkPulumiSchema rather than calling
-# this directly.
-#
-# `src` defaults to fetchProviderSource's fetch of `owner`/`repo`/`rev`/`hash`
-# (`rev` defaulting to `v${version}`); pass `src` to build from a local
-# checkout or a different fetcher, in which case those three can be omitted.
-# `repo` is a formal either way: it also names the output.
 {
   repo,
   version,

@@ -1,6 +1,3 @@
-# Every example is a perSystem module declaring one `pulumi.*` entry. This is
-# also the module's own dogfooding: if a builder can't be expressed through the
-# options, it shows up here first.
 { ... }:
 {
   imports = [

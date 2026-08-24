@@ -1,8 +1,3 @@
-# Like with-sdks.nix, but for packages whose per-language SDK source is
-# generated on demand from a schema.json via mkGeneratedSdk (component
-# providers) instead of fetched from an upstream repo. Each `<lang>Args`
-# block carries a `languagePlugin` consumed here, stripped before forwarding
-# the rest to that language's registered SDK builder.
 {
   lib,
   attachSdks,
@@ -22,11 +17,6 @@
 let
   argNames = langArgNames args;
 
-  # Go is the one generated SDK that isn't self-contained. Its codegen needs
-  # `language.go.importBasePath` in the schema to emit self-imports matching the
-  # directories it writes, and it emits no `go.mod`/`go.sum` at all, so both the
-  # module path and the module files come from the caller. Consumed here, never
-  # forwarded to sdkBuilders.go.
   goOnlyArgs = [
     "importBasePath"
     "goMod"

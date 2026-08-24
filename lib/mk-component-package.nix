@@ -1,7 +1,3 @@
-# Builds a source-based, multi-language component provider package and layers
-# per-language SDK generation on top via with-generated-sdks.nix. The `schemaArgs`
-# arg is kept separate from the top-level `<lang>Args` blocks because schema
-# extraction and SDK packaging need independent npm dependency contexts.
 {
   stdenv,
   mkComponentSchema,

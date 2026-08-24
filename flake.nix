@@ -42,15 +42,10 @@
           overlaidPkgs = pkgs.extend (import ./lib/overlay.nix);
           tools = {
             pulumi-language-dotnet = config.pulumi.lib.pulumiLanguageDotnet;
-            # Exercises flake.overlays.default itself, not just flake.lib's curried-builder path.
-            # Same build recipe/output as pulumi-language-dotnet above, so this proves the
-            # overlay wires a real derivation without paying for a second build.
             overlay-pulumi-language-dotnet = overlaidPkgs.pulumiLanguageDotnet;
           };
         in
         {
-          # Every example declares itself through the flake module's options,
-          # which is what populates packages/checks below.
           imports = [ ./examples ];
 
           packages = tools // {
@@ -58,25 +53,16 @@
           };
 
           checks = tools // {
-            # A unit check rather than another example: narrowing is pure `lib`
-            # work on a `src`, and no example can reach it because they all take
-            # the default fetch's pass-through branch.
             narrow-sdk-src = import ./checks/narrow-sdk-src.nix {
               inherit lib pkgs;
               inherit (config.pulumi.lib) narrowSdkSrc;
             };
 
-            # Same reasoning, for the `sourceRoot` name the same `src` resolves
-            # to. Kept separate from narrow-sdk-src so a failure names which of
-            # the two decisions went wrong.
             src-name = import ./checks/src-name.nix {
               inherit lib pkgs;
               inherit (config.pulumi.lib) srcName;
             };
 
-            # Every other SDK check only asserts that the SDK builds, which a
-            # bundled `@pulumi/pulumi` passes: the breakage is in what the
-            # output *contains*, and only shows up in a consuming program.
             sdk-omit-deps = pkgs.runCommandLocal "sdk-omit-deps" { } ''
               pkg=${config.packages.pulumi-command-sdk-nodejs}/lib/node_modules/@pulumi/command
               test -f "$pkg/index.js"
@@ -89,16 +75,6 @@
               touch $out
             '';
 
-            # Same reasoning as sdk-omit-deps: the build passing is not the
-            # property we care about. `mkDynamicBridgeProvider` compiles a
-            # version into the binary, and a SHA-pinned example builds just as
-            # happily with the wrong string baked in - the breakage only shows
-            # up when the CLI reads the version back.
-            #
-            # Read through the binary's own `--version`, which it answers with
-            # exit 0 before serving any RPC, rather than grepping the object
-            # file: that is the same path `pulumi plugin ls` and plugin-version
-            # resolution take, so it tests the value that actually reaches them.
             dynamic-bridge-version = pkgs.runCommandLocal "dynamic-bridge-version" { } ''
               want=v1.1.3
               got=$(${lib.getExe config.packages.pulumi-terraform-provider} --version)
@@ -112,7 +88,6 @@
               touch $out
             '';
 
-            # Filtered to .nix files so an unrelated README edit doesn't rebuild it.
             nix-lint =
               let
                 nixFiles = lib.fileset.toSource {
