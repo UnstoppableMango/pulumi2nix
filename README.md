@@ -173,6 +173,26 @@ The two layerers differ in where an SDK's *source* comes from.
 
 Several small helpers are shared by nearly every builder and are left out above to keep the graph readable: `fetchProviderSource` (the default `owner`/`repo`/`rev`/`hash` fetch), `srcName` (resolving `sourceRoot` from any `src`), `narrowSdkSrc` ([narrowed SDK sources](#narrowed-sdk-sources)), `langArgNames` (picking `<lang>Args` out of the caller's arguments), and `attachSdks` (merging built SDKs onto `passthru.sdks` so the two layerers chain rather than overwrite).
 
+#### Deviations from Pulumi's graph
+
+The builder graph should be the artifact graph, one derivation per node.
+Where the two diagrams disagree, the difference is a cost, not a design: it means a node exists twice, or an edge skips the node it should pass through, and both make the library harder to reason about than Pulumi itself.
+The current deviations, and what closing each one takes:
+
+| Deviation | Why it is there | Closing it |
+| --- | --- | --- |
+| `schema.json` is built twice for one provider: once as `passthru.schema`, and again inside the provider build, whose `postConfigure` re-runs `${cmdGen} schema` before `go generate` (`lib/mk-terraform-bridge-provider.nix:211`). | The `go generate` step embeds the schema from the repo's own path, and the build has a gen tool on hand already. | Copy the already-built `passthru.schema` into that path instead of regenerating it, after confirming tfgen's `schema` subcommand has no other in-tree side effect the build depends on. |
+| `mkPulumiPackage` is `mkTerraformBridgeProvider` with `passthru.schema` swapped out (`lib/mk-pulumi-package.nix:19`), so the native path is a child of the bridged one rather than its sibling. | Both build a Go binary out of `provider/` and layer the same SDKs, and the bridge builder got there first. | Hoist `mkBasePackage` and the SDK layering into a base both call. Until then the native path inherits tfgen's conventions, which is what forces `mkPulumiPackage`'s `postConfigure` guard. |
+| Under `mkPulumiPackage`, a *generated* SDK codegens from `mkTerraformBridgeSchema`, not from the `mkPulumiSchema` that the same package exposes as `passthru.schema`. | Follows from the delegation above: the swap happens after `withGeneratedSdks` has already been handed the bridge's schema. | Same fix. No example sets `sdks.<lang>.generate` on a native provider, so this path is currently unexercised rather than known-good. |
+| Python bypasses `mkSdk` and the `lib/sdks` registry entirely, built in place by `mkPythonPackage` and attached straight to `passthru.sdks.python` (`lib/mk-terraform-bridge-provider.nix:218`). It is also the one language built unconditionally. | The version and `pkg_resources` patching it carries has no equivalent in the other builders. | Register `lib/sdks/python.nix` and route it through `mkSdk` like every other language, which also closes [component providers' missing python SDK](TODO.md#python-sdks-for-component-providers). |
+| `mkSdkDriftCheck` diffs the committed tree against `${cmdGen} <lang> --out` (`lib/mk-sdk-drift-check.nix:86`), an SDK-from-gen-tool edge that skips the schema node. | It predates the generation path, and on a pre-delegation bridge `cmdGen <lang>` is genuinely a different generator from `gen-sdk`. | Diff against `mkGeneratedSdk` output instead, reusing a builder that already exists. Blocked for providers shipping tfgen [language overlays](TODO.md#generated-bridged-sdks-do-not-get-tfgens-language-overlays), whose committed SDK is by definition not reproducible from the schema. |
+
+`withSdks` reading a committed `sdk/<lang>` is the largest departure from the diagram above, where every SDK descends from `schema.json`, and it is the one deviation kept on purpose: upstream repos commit those trees, and tfgen's language overlays cannot be recovered from a schema.
+[`sdks.<lang>.generate`](#generated-sdks-for-bridged-providers) is the aligned path for providers that do not need them, and [`sdkDrift`](#sdk-drift-checks) is the compensation for those that do.
+
+Two more deviations are upstream's rather than this library's, and cannot be closed here: `mkGeneratedGoSdk` exists only because `gen-sdk` emits no `go.mod`/`go.sum`, and `pulumiLanguageDotnet` is patched to read an offline logo because codegen otherwise reaches the network mid-build.
+The .NET one could at least be narrowed by taking a caller-supplied logo derivation, so a real `logoUrl` can be fetched by hash rather than replaced with the generic icon.
+
 ## Usage
 
 There are three entry points, in increasing order of how much plumbing they do for you: the [flake module](#flake-module), the [overlay](#overlay), and `pulumi2nix.lib` with `callPackage`.
