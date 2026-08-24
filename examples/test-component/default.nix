@@ -34,6 +34,14 @@
         languagePlugin = pulumi2nix.pulumiLanguageDotnet;
         nugetDeps = ./generated-sdk/dotnet/deps.json;
       };
+
+      python = {
+        languagePlugin = pkgs.pulumiPackages.pulumi-python;
+
+        # The generated SDK distributes under the *schema's* package name, which
+        # `pulumi package get-schema` takes from package.json, not from `pname`.
+        distName = "pulumi_test_component_schema";
+      };
     };
 
     meta = {

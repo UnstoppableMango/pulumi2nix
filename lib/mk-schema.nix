@@ -1,46 +1,32 @@
+# Builds `schema.json` by running a provider repo's own gen tool.
+#
+# The tool itself is `mkGenTool`'s artifact, not this one's: pass `genTool` to
+# reuse a build, or let the default construct it from the same arguments. Only
+# `schemaCommand` differs between conventions, which is what `mkPulumiSchema`
+# and `mkTerraformBridgeSchema` fill in.
 {
   stdenv,
-  buildGoModule,
   fetchProviderSource,
+  mkGenTool,
   srcName,
 }:
 {
   repo,
   version,
   src ? fetchProviderSource "mk-schema.nix" args,
-  vendorHash,
-  cmdGen,
   schemaCommand,
-  extraLdflags ? [ ],
-  env ? { },
   meta ? { },
   ...
 }@args:
 let
-  pulumi-gen = buildGoModule {
-    pname = cmdGen;
-    inherit
-      src
-      version
-      vendorHash
-      env
-      ;
-    sourceRoot = "${srcName src}/provider";
-    subPackages = [ "cmd/${cmdGen}" ];
-    doCheck = false;
-    ldflags = [
-      "-s"
-      "-w"
-    ]
-    ++ extraLdflags;
-  };
+  genTool = args.genTool or (mkGenTool (args // { inherit src; }));
 in
 stdenv.mkDerivation {
   pname = "${repo}-schema";
   inherit src version meta;
 
   sourceRoot = "${srcName src}/provider";
-  nativeBuildInputs = [ pulumi-gen ];
+  nativeBuildInputs = [ genTool ];
 
   dontConfigure = true;
   dontBuild = true;
@@ -57,4 +43,6 @@ stdenv.mkDerivation {
 
     runHook postInstall
   '';
+
+  passthru = { inherit genTool; };
 }

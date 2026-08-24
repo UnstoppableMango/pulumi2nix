@@ -8,8 +8,8 @@
   rev ? "v${version}",
   versionString ? rev,
   version,
-  hash ? throw "mk-dynamic-bridge-provider.nix: `hash` is required unless `src` is supplied",
-  src ? fetchProviderSource "mk-dynamic-bridge-provider.nix" {
+  hash ? throw "mk-dynamic-plugin.nix: `hash` is required unless `src` is supplied",
+  src ? fetchProviderSource "mk-dynamic-plugin.nix" {
     inherit
       owner
       repo

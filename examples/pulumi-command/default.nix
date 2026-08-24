@@ -14,14 +14,6 @@ in
     cmdRes = "pulumi-resource-command";
     extraLdflags = [ "-X github.com/pulumi/${repo}/provider/pkg/version.Version=v${version}" ];
 
-    postConfigure = ''
-      pushd ..
-
-      ${cmdGen} provider/cmd/pulumi-resource-command/schema.json --version ${version}
-
-      popd
-    '';
-
     __darwinAllowLocalNetworking = true;
 
     sdks = {
@@ -31,6 +23,7 @@ in
       };
       go.vendorHash = "sha256-AHCeuby00woF/OQIwHjEp1Y92ANbewjQSk/nAc9qTgE=";
       dotnet.nugetDeps = ./deps.json;
+      python = { };
     };
 
     meta = {

@@ -9,7 +9,7 @@
 let
   inherit (lib) mkOption types;
 
-  inherit (import ./fragments.nix { inherit lib; }) required;
+  inherit (import ./fragments.nix { inherit lib; }) optional required;
 
   exposure = {
     exposePackage = mkOption {
@@ -132,6 +132,16 @@ let
   dotnetCommon = {
     nugetDeps = required types.raw "NuGet lock file (`deps.json`) for the SDK.";
   };
+
+  pythonCommon = {
+    distName = optional types.str ''
+      The name the SDK distributes under, which follows the plugin name rather
+      than the repo's: `pulumi-resource-random` gives `pulumi-random`, whatever
+      the repo is called. Drives `pythonImportsCheck` (dashes to underscores)
+      and the version check. Defaulted by the provider recipes; set it for an
+      SDK that does not follow the convention.
+    '';
+  };
 in
 rec {
   checkedIn = types.submodule {
@@ -164,15 +174,11 @@ rec {
       };
 
       python = mkOption {
-        type = checkedInSdk { };
+        type = checkedInSdk pythonCommon;
         default = null;
         description = ''
-          Extra arguments for the python SDK. Unlike the other languages this
-          does not select whether a python SDK is built: mkTerraformBridgeProvider
-          always builds one, and lib/lang-arg-names.nix deliberately excludes
-          `pythonArgs` from the generic dispatch. `generate` still selects where
-          its source comes from, handled by that builder directly rather than by
-          lib/with-generated-sdks.nix.
+          Build the repo's `sdk/python` distribution. Opt-in like every other
+          language: declare it (`python = { }` is enough) to get one.
         '';
       };
     };
@@ -220,6 +226,12 @@ rec {
         type = sdk ({ inherit languagePlugin; } // dotnetCommon);
         default = null;
         description = "Generate and pack a .NET SDK from the extracted schema.";
+      };
+
+      python = mkOption {
+        type = sdk ({ inherit languagePlugin; } // pythonCommon);
+        default = null;
+        description = "Generate and build a python SDK from the extracted schema.";
       };
     };
   };

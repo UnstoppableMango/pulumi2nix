@@ -12,6 +12,7 @@ flowchart TD
   apisrc["OpenAPI / CloudFormation<br/>resource definitions"]
   compsrc["Component source tree<br/>+ PulumiPlugin.yaml"]
   dynsrc["pulumi-terraform-bridge<br/>dynamic/"]
+  committed["Committed sdk/&lt;lang&gt;<br/>in the provider repo"]
 
   tfgen["pulumi-tfgen-&lt;name&gt;<br/>gen tool binary"]
   nativegen["pulumi-gen-&lt;name&gt;<br/>gen tool binary"]
@@ -24,7 +25,8 @@ flowchart TD
   dyn["pulumi-resource-terraform-provider<br/>generic, parameterized at runtime"]
 
   gensdk["pulumi package gen-sdk<br/>via pulumi-language-&lt;lang&gt;"]
-  sdk["Language SDKs<br/>nodejs / python / go / dotnet"]
+  sdksrc["SDK source tree<br/>sdk/&lt;lang&gt;"]
+  sdk["Packaged SDKs<br/>npm / wheel / go module / nupkg"]
 
   cache["Plugin cache<br/>~/.pulumi/plugins"]
   prog["Your Pulumi program"]
@@ -37,7 +39,10 @@ flowchart TD
   compsrc --> comppkg
 
   schema --> res
-  schema --> gensdk --> sdk
+  schema --> gensdk --> sdksrc
+  tfgen -. "&lt;lang&gt; --out<br/>replays language overlays" .-> sdksrc
+  committed --> sdksrc
+  sdksrc --> sdk
 
   dynsrc --> dyn
   dyn -. "parameterize:<br/>pulumi package add terraform-provider …" .-> schema
@@ -50,43 +55,58 @@ flowchart TD
   prog --> stack
 
   classDef p2n stroke:#5277C3,stroke-width:3px
-  class tfgen,nativegen,gethost,schema,res,comppkg,dyn,gensdk,sdk p2n
+  class tfgen,nativegen,gethost,schema,res,comppkg,dyn,sdksrc,sdk p2n
 
   linkStyle default stroke-width:1.5px
 ```
 
-Thick-bordered nodes are the artifacts pulumi2nix builds.
-Note the two routes into `schema.json`: a *compiled gen tool* for native and ahead-of-time-bridged providers, versus [`pulumi package get-schema`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_get-schema/) launching the component's own language host to serve `GetSchema` straight from source.
-The dynamic bridge is a sibling rather than a child of that chain, since it takes its Terraform provider at runtime instead of being generated against one ahead of time.
+Thick-bordered nodes are the artifacts pulumi2nix builds, and each has exactly one builder.
+
+Three things in that graph are worth naming, because they are what the builder set has to model.
+`schema.json` has two producers: a *compiled gen tool* for native and ahead-of-time-bridged providers, versus [`pulumi package get-schema`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_get-schema/) launching the component's own language host to serve `GetSchema` straight from source.
+An *SDK source tree* has three: codegen from the schema, the tree the upstream repo commits, and the gen tool emitting one directly, which is the only route that replays tfgen's per-language overlays.
+And the dynamic bridge is a sibling rather than a child of the chain, since it takes its Terraform provider at runtime instead of being generated against one ahead of time.
+
 A [component](https://www.pulumi.com/docs/iac/concepts/resources/components/) package has no compiled resource binary at all: the source tree plus its `PulumiPlugin.yaml` *is* the plugin.
 
 ## The builders
 
-Every builder below is reachable from `pulumi2nix.lib`, `overlays.default`, or the flake module.
-Arrows read "is built from".
+One builder per artifact. Each builds a single derivation and composes nothing.
+
+| Artifact | Builder |
+| --- | --- |
+| gen tool binary | [`mkGenTool`](usage.md#mkgentool) |
+| `schema.json`, from a gen tool | [`mkSchema`](usage.md#mkschema) |
+| `schema.json`, from component source | [`mkComponentSchema`](usage.md#mkcomponentschema) |
+| `pulumi-resource-<name>` binary | [`mkProviderPlugin`](usage.md#mkproviderplugin) |
+| component plugin tree | [`mkComponentPlugin`](usage.md#mkcomponentplugin) |
+| `pulumi-resource-terraform-provider` | [`mkDynamicPlugin`](usage.md#mkdynamicplugin) |
+| one SDK source tree | [`mkSdkSource`](usage.md#mksdksource) |
+| one packaged SDK | [`mkSdk`](usage.md#mksdk) |
+
+Where an artifact has more than one producer, the producer is an *argument*, not another builder: `mkSdkSource` takes `src`, `schema` or `genTool`, and picks its route from which one it was given.
+
+The recipes compose those builders into a whole package. They are convenience, not artifacts, and none of them calls another.
 
 ```mermaid
 flowchart LR
-  subgraph entry["Package builders"]
+  subgraph recipes["Package recipes"]
     mkPulumiPackage["mkPulumiPackage<br/><i>native provider</i>"]
     mkTerraformBridgeProvider["mkTerraformBridgeProvider<br/><i>bridged provider</i>"]
-    mkDynamicBridgeProvider["mkDynamicBridgeProvider<br/><i>dynamic bridge</i>"]
+    mkProviderPackage["mkProviderPackage<br/><i>shared composition</i>"]
     mkComponentPackage["mkComponentPackage<br/><i>component provider</i>"]
+    mkDynamicBridgeProvider["mkDynamicBridgeProvider<br/><i>= mkDynamicPlugin</i>"]
   end
 
-  subgraph schemas["Schema builders"]
-    mkPulumiSchema["mkPulumiSchema"]
-    mkTerraformBridgeSchema["mkTerraformBridgeSchema"]
-    mkSchema["mkSchema<br/><i>generic base</i>"]
+  subgraph artifacts["Artifact builders"]
+    mkGenTool["mkGenTool"]
+    mkSchema["mkSchema"]
     mkComponentSchema["mkComponentSchema"]
-  end
-
-  subgraph layering["SDK layering"]
-    withSdks["withSdks<br/><i>committed sdk/&lt;lang&gt;</i>"]
-    withGeneratedSdks["withGeneratedSdks<br/><i>codegen from schema</i>"]
+    mkProviderPlugin["mkProviderPlugin"]
+    mkComponentPlugin["mkComponentPlugin"]
+    mkDynamicPlugin["mkDynamicPlugin"]
+    mkSdkSource["mkSdkSource"]
     mkSdk["mkSdk"]
-    mkGeneratedSdk["mkGeneratedSdk"]
-    mkGeneratedGoSdk["mkGeneratedGoSdk"]
   end
 
   subgraph langs["Per-language SDK builders"]
@@ -94,66 +114,77 @@ flowchart LR
     yarn["sdks/yarn.nix"]
     go["sdks/go.nix"]
     dotnet["sdks/dotnet.nix"]
+    python["sdks/python.nix"]
   end
 
-  mkSdkDriftCheck["mkSdkDriftCheck<br/><i>check-only</i>"]
+  withSdks["withSdks<br/><i>layerer</i>"]
+  mkSdkDriftCheck["mkSdkDriftCheck<br/><i>diff, check-only</i>"]
   pulumiLanguageDotnet["pulumiLanguageDotnet<br/><i>language host, not a builder</i>"]
 
-  mkPulumiPackage --> mkTerraformBridgeProvider
-  mkPulumiPackage --> mkPulumiSchema
-  mkTerraformBridgeProvider --> mkTerraformBridgeSchema
-  mkTerraformBridgeProvider --> withSdks
-  mkTerraformBridgeProvider --> withGeneratedSdks
-  mkTerraformBridgeProvider --> mkGeneratedSdk
-  mkTerraformBridgeProvider -. "sdkDrift.languages" .-> mkSdkDriftCheck
+  mkPulumiPackage --> mkProviderPackage
+  mkTerraformBridgeProvider --> mkProviderPackage
+  mkDynamicBridgeProvider --> mkDynamicPlugin
+
+  mkProviderPackage --> mkGenTool
+  mkProviderPackage --> mkSchema
+  mkProviderPackage --> mkProviderPlugin
+  mkProviderPackage --> withSdks
+  mkProviderPackage --> mkSdkDriftCheck
+
   mkComponentPackage --> mkComponentSchema
-  mkComponentPackage --> withGeneratedSdks
+  mkComponentPackage --> mkComponentPlugin
+  mkComponentPackage --> withSdks
 
-  mkPulumiSchema --> mkSchema
-  mkTerraformBridgeSchema --> mkSchema
+  mkGenTool -. "genTool" .-> mkSchema
+  mkSchema -. "schema" .-> mkProviderPlugin
 
+  withSdks --> mkSdkSource
   withSdks --> mkSdk
-  withGeneratedSdks --> mkSdk
-  withGeneratedSdks --> mkGeneratedSdk
-  withGeneratedSdks --> mkGeneratedGoSdk
-  mkGeneratedGoSdk --> mkGeneratedSdk
+  mkSdkDriftCheck --> mkSdkSource
+
+  mkGenTool -. "genTool" .-> mkSdkSource
+  mkSchema -. "schema" .-> mkSdkSource
 
   mkSdk --> npm
   mkSdk --> yarn
   mkSdk --> go
   mkSdk --> dotnet
+  mkSdk --> python
 
-  pulumiLanguageDotnet -. "languagePlugin" .-> mkGeneratedSdk
-  pulumiLanguageDotnet -. "languagePlugin" .-> mkSdkDriftCheck
+  pulumiLanguageDotnet -. "languagePlugin" .-> mkSdkSource
 
   linkStyle default stroke-width:1.5px
 ```
 
-`mkDynamicBridgeProvider` stands alone: it builds one generic binary, so it has no schema step and no SDKs.
+`mkDynamicPlugin` stands alone: it builds one generic binary, so it has no schema step and no SDKs, and its recipe is the builder itself.
 
-The two layerers differ in where an SDK's *source* comes from.
-`withSdks` reads the tree the upstream repo already commits at `sdk/<lang>`; `withGeneratedSdks` runs codegen against `schema.json` instead.
-`mkTerraformBridgeProvider` chains both, deciding per language from `sdks.<lang>.generate`, so one provider can commit some SDKs and generate others.
-`mkComponentPackage` only ever generates, since a component provider has no committed SDK tree.
-
-Several small helpers are shared by nearly every builder and are left out above to keep the graph readable: `fetchProviderSource` (the default `owner`/`repo`/`rev`/`hash` fetch), `srcName` (resolving `sourceRoot` from any `src`), `narrowSdkSrc` ([narrowed SDK sources](sdks.md#narrowed-sdk-sources)), `langArgNames` (picking `<lang>Args` out of the caller's arguments), and `attachSdks` (merging built SDKs onto `passthru.sdks` so the two layerers chain rather than overwrite).
+Several small helpers are shared by nearly every builder and are left out above to keep the graph readable: `fetchProviderSource` (the default `owner`/`repo`/`rev`/`hash` fetch), `srcName` (resolving `sourceRoot` from any `src`), `narrowSdkSrc` ([narrowed SDK sources](sdks.md#narrowed-sdk-sources), used by `mkSdkSource`'s committed route), and `langArgNames` (picking `<lang>Args` out of the caller's arguments).
 
 ## Deviations from Pulumi's graph
 
 The builder graph should be the artifact graph, one derivation per node.
-Where the two diagrams disagree, the difference is a cost, not a design: it means a node exists twice, or an edge skips the node it should pass through, and both make the library harder to reason about than Pulumi itself.
-The current deviations, and what closing each one takes:
+Where the two disagree, the difference is a cost, not a design: it means a node exists twice, or an edge skips the node it should pass through, and both make the library harder to reason about than Pulumi itself.
 
-| Deviation | Why it is there | Closing it |
-| --- | --- | --- |
-| `schema.json` is built twice for one provider: once as `passthru.schema`, and again inside the provider build, whose `postConfigure` re-runs `${cmdGen} schema` before `go generate` (`lib/mk-terraform-bridge-provider.nix:211`). | The `go generate` step embeds the schema from the repo's own path, and the build has a gen tool on hand already. | Copy the already-built `passthru.schema` into that path instead of regenerating it, after confirming tfgen's `schema` subcommand has no other in-tree side effect the build depends on. |
-| `mkPulumiPackage` is `mkTerraformBridgeProvider` with `passthru.schema` swapped out (`lib/mk-pulumi-package.nix:19`), so the native path is a child of the bridged one rather than its sibling. | Both build a Go binary out of `provider/` and layer the same SDKs, and the bridge builder got there first. | Hoist `mkBasePackage` and the SDK layering into a base both call. Until then the native path inherits tfgen's conventions, which is what forces `mkPulumiPackage`'s `postConfigure` guard. |
-| Under `mkPulumiPackage`, a *generated* SDK codegens from `mkTerraformBridgeSchema`, not from the `mkPulumiSchema` that the same package exposes as `passthru.schema`. | Follows from the delegation above: the swap happens after `withGeneratedSdks` has already been handed the bridge's schema. | Same fix. No example sets `sdks.<lang>.generate` on a native provider, so this path is currently unexercised rather than known-good. |
-| Python bypasses `mkSdk` and the `lib/sdks` registry entirely, built in place by `mkPythonPackage` and attached straight to `passthru.sdks.python` (`lib/mk-terraform-bridge-provider.nix:218`). It is also the one language built unconditionally. | The version and `pkg_resources` patching it carries has no equivalent in the other builders. | Register `lib/sdks/python.nix` and route it through `mkSdk` like every other language, which also closes [component providers' missing python SDK](../TODO.md#python-sdks-for-component-providers). |
-| `mkSdkDriftCheck` diffs the committed tree against `${cmdGen} <lang> --out` (`lib/mk-sdk-drift-check.nix:86`), an SDK-from-gen-tool edge that skips the schema node. | It predates the generation path, and on a pre-delegation bridge `cmdGen <lang>` is genuinely a different generator from `gen-sdk`. | Diff against `mkGeneratedSdk` output instead, reusing a builder that already exists. Blocked for providers shipping tfgen [language overlays](../TODO.md#generated-bridged-sdks-do-not-get-tfgens-language-overlays), whose committed SDK is by definition not reproducible from the schema. |
+One deviation is left, and it is kept on purpose.
 
-`withSdks` reading a committed `sdk/<lang>` is the largest departure from the diagram above, where every SDK descends from `schema.json`, and it is the one deviation kept on purpose: upstream repos commit those trees, and tfgen's language overlays cannot be recovered from a schema.
-[`sdks.<lang>.generate`](sdks.md#generated-sdks-for-bridged-providers) is the aligned path for providers that do not need them, and [`sdkDrift`](sdks.md#sdk-drift-checks) is the compensation for those that do.
+| Deviation | Why it is kept |
+| --- | --- |
+| `mkSdkSource`'s committed route reads a tree the upstream repo already ships at `sdk/<lang>`, rather than deriving it from `schema.json`. | Upstream repos commit those trees, and tfgen's language overlays cannot be recovered from a schema. [`sdks.<lang>.generate`](sdks.md#generated-sdks-for-bridged-providers) is the aligned path for providers that do not need them, and [`sdkDrift`](sdks.md#sdk-drift-checks) is the compensation for those that do. It is a producer of a modelled node, not an edge around one. |
 
-Two more deviations are upstream's rather than this library's, and cannot be closed here: `mkGeneratedGoSdk` exists only because [`gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) emits no `go.mod`/`go.sum`, and [`pulumiLanguageDotnet`](https://github.com/pulumi/pulumi-dotnet) is patched to read an offline logo because codegen otherwise reaches the network mid-build.
+Two more are upstream's rather than this library's, and cannot be closed here.
+`mkSdkSource` takes a caller-supplied `go.mod`/`go.sum` because [`gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) emits no module files, and [`pulumiLanguageDotnet`](https://github.com/pulumi/pulumi-dotnet) is patched to read an offline logo because codegen otherwise reaches the network mid-build.
 The .NET one could at least be narrowed by taking a caller-supplied logo derivation, so a real `logoUrl` can be fetched by hash rather than replaced with the generic icon.
+
+### Closed
+
+For the record, since the shape of the library is easier to read against what it used to be:
+
+| Was | Closed by |
+| --- | --- |
+| `schema.json` was built twice per bridged provider: once as `passthru.schema`, once again by a gen tool run inside the plugin build's `postConfigure`. | `mkProviderPlugin` takes a `schema` derivation and plants it at `provider/cmd/<cmdRes>/schema.json`, where the repo's `generate.go` reads it. The gen tool is no longer an input to the plugin build at all. |
+| The gen tool binary had no builder, and two near-identical `buildGoModule` calls built it inline. | `mkGenTool`, taken as an input by `mkSchema` and by `mkSdkSource`'s gen-tool route. |
+| `mkPulumiPackage` was `mkTerraformBridgeProvider` with `passthru.schema` swapped out, so the native path was a child of the bridged one, and a generated SDK under it codegened from the *bridge's* schema. | Both are presets over `mkProviderPackage`, differing only in `schemaCommand` and `embedSchema`. Each composes its own schema, and its SDKs descend from that one. |
+| `mkPulumiPackage` required every caller to pass a `postConfigure`, because it inherited tfgen's conventions. | Gone. A `pulumi-go-provider` provider serves its schema from Go structs and embeds nothing, so the native preset plants no schema and runs no `go generate`; `embedSchema = true` is there for a native provider that does embed one. |
+| Python bypassed `mkSdk` and the `lib/sdks` registry, built in place by the bridge builder and attached straight to `passthru.sdks.python`. It was also the one language built unconditionally. | `lib/sdks/python.nix`, registered like every other language and opt-in like every other language. This also gives component providers a python SDK, which they previously could not have. |
+| `mkSdkDriftCheck` ran `${cmdGen} <lang> --out` itself, an SDK-from-gen-tool edge that skipped the schema node. | That edge is real in Pulumi's graph, so it is modelled: it is one of `mkSdkSource`'s three producers. The check builds nothing now, and is a `diff` of two SDK source trees. |
+| Two layerers, `withSdks` and `withGeneratedSdks`, differing only in where an SDK's source came from, plus an `attachSdks` helper so they could chain. | One `withSdks`. The per-language `generate` flag picks a `mkSdkSource` producer, so one provider can still commit some SDKs and generate others. |

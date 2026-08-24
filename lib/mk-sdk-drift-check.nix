@@ -1,29 +1,30 @@
-# Fails when a provider's committed `sdk/<lang>` doesn't match what its gen
-# tool emits from source. Provider builders read SDK source straight out of
-# the source tree's `sdk/<lang>` (see lib/with-sdks.nix), so a resource change
-# that lands without a regenerated SDK still builds, and `nix flake check`
-# stays green against a stale tree; this closes that loop by re-running the
-# same `cmdGen` binary the provider build already uses into a scratch
-# directory and diffing the result against what is committed.
+# Fails when a provider's committed `sdk/<lang>` doesn't match what the same
+# provider generates. Provider builders read SDK source straight out of the
+# tree's `sdk/<lang>`, so a resource change that lands without a regenerated SDK
+# still builds and `nix flake check` stays green against a stale tree; this
+# closes that loop.
 #
+# It generates nothing itself. Both sides are `mkSdkSource` derivations, so the
+# check is a diff and the choice of generator stays with the caller: the gen
+# tool (exact, replays tfgen's language overlays) or `gen-sdk` from the schema.
 {
   lib,
   stdenv,
   diffutils,
-  pulumi,
-  srcName,
 }:
 {
   pname,
-  version,
   lang,
-  src,
-  cmdGen,
-  pulumiGen,
 
-  languagePlugin ? null,
+  # Both sides are SDK source trees, holding the SDK at `<path>` below.
+  committed,
+  against,
+  committedPath ? "sdk/${lang}",
+  againstPath ? "sdk/${lang}",
 
-  sdkPath ? "sdk/${lang}",
+  # Names the command that regenerates the committed tree, for the failure
+  # message only.
+  regenerateCommand ? "the repo's `make generate`",
 
   exclude ? [
     "package-lock.json"
@@ -33,6 +34,7 @@
   ],
   extraExclude ? [ ],
 
+  version ? "0",
   meta ? { },
 }:
 let
@@ -41,52 +43,39 @@ let
 
   message = ''
 
-    ${pname}: ${sdkPath} does not match what ${cmdGen} generates.
+    ${pname}: ${committedPath} does not match what this provider generates.
 
     The committed SDK is stale with respect to the provider source. Regenerate it
-    with `${cmdGen} ${lang} --out ${sdkPath}` (usually via the repo's `make generate`)
-    and commit the result.
+    with ${regenerateCommand} and commit the result.
 
     Excluded from the comparison: ${lib.concatStringsSep ", " excluded}
-    In the diff below, "-" lines are the committed ${sdkPath} and "+" lines are
+    In the diff below, "-" lines are the committed ${committedPath} and "+" lines are
     what was just generated.
   '';
 in
 stdenv.mkDerivation {
-  name = "${pname}-sdk-${lang}-generated";
-  inherit src version meta;
+  name = "${pname}-sdk-${lang}-drift";
+  inherit version meta;
 
-  sourceRoot = srcName src;
+  nativeBuildInputs = [ diffutils ];
 
-  nativeBuildInputs = [
-    pulumiGen
-    diffutils
-  ]
-  ++ lib.optionals (languagePlugin != null) [
-    pulumi
-    languagePlugin
-  ];
-
+  dontUnpack = true;
   dontConfigure = true;
   dontBuild = true;
 
   installPhase = ''
     runHook preInstall
 
-    if [[ ! -d ${lib.escapeShellArg sdkPath} ]]; then
-      echo "mkSdkDriftCheck: ${pname} has no committed ${sdkPath} to compare against." >&2
+    committed=${committed}/${committedPath}
+    generated=${against}/${againstPath}
+
+    if [[ ! -d "$committed" ]]; then
+      echo "mkSdkDriftCheck: ${pname} has no committed ${committedPath} to compare against." >&2
       echo "Either commit the generated SDK, or drop ${lang} from this provider's drift check." >&2
       exit 1
     fi
 
-    generated="$NIX_BUILD_TOP/generated-${lang}"
-    mkdir -p "$generated"
-
-    export HOME=$TMPDIR
-    ${cmdGen} ${lang} --out "$generated"
-
-    if ! diff -r -u ${excludeFlags} ${lib.escapeShellArg sdkPath} "$generated" \
-      > "$NIX_BUILD_TOP/drift.diff"; then
+    if ! diff -r -u ${excludeFlags} "$committed" "$generated" > "$NIX_BUILD_TOP/drift.diff"; then
       printf '%s\n' ${lib.escapeShellArg message} >&2
       cat "$NIX_BUILD_TOP/drift.diff" >&2
       exit 1

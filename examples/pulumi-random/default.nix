@@ -16,6 +16,8 @@ in
 
     __darwinAllowLocalNetworking = true;
 
+    sdks.python = { };
+
     meta = {
       description = "pulumi2nix example: pulumi-random via mkTerraformBridgeProvider";
       mainProgram = "pulumi-resource-random";

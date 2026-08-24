@@ -45,7 +45,7 @@ Editing a file no SDK reads (a README, a CI workflow, the Makefile) then no long
 
 `README.md` and `LICENSE` are in the nodejs list because the SDK build copies them next to its compiled output.
 Missing paths are skipped rather than failing, and if the SDK's own directory is missing the whole tree is kept.
-The provider and schema builds always keep the whole tree: `postConfigure` runs the gen tool from the repo root, and tfgen reads the upstream provider's docs.
+The schema build always keeps the whole tree, since the gen tool runs from the repo root and tfgen reads the upstream provider's docs; so does the plugin build, which needs the whole Go module.
 Narrowing needs a tree readable at eval time, so a `src` that is still an unbuilt derivation (the default fetch) is passed through untouched, which costs nothing: that output only moves when `rev` does.
 
 Two per-SDK escape hatches, for a repo whose SDK build reads outside its own directory:
@@ -100,8 +100,12 @@ Yarn classic has no real `prune`, so `sdks.yarnNodejs` deletes them afterwards a
 ## SDK drift checks
 
 `mkTerraformBridgeProvider` reads committed SDKs straight out of `sdk/<lang>`, so a resource change landing without a regenerated SDK still builds and `nix flake check` stays green against a stale tree.
-`sdkDrift.languages` closes that loop: per language it re-runs the provider's own `cmdGen` into a scratch directory and `diff -r`s against the committed tree, emitting `checks.<name>-sdk-<lang>-generated`.
+`sdkDrift.languages` closes that loop: per language it `diff -r`s the committed tree against one the provider's own `cmdGen` just emitted, and emits `checks.<name>-sdk-<lang>-drift`.
 The check never appears in `packages`, since its output is an empty marker file.
+
+Both sides are [`mkSdkSource`](usage.md#mksdksource) trees, so the check itself generates nothing.
+The gen tool is the default generator rather than `gen-sdk` because it is the only route that replays tfgen's language overlays, which is exactly what a provider committing an SDK tree tends to have.
+Call [`mkSdkDriftCheck`](usage.md#mksdkdriftcheck) directly to diff against a schema-generated tree instead.
 
 ```nix
 pulumi.terraformBridgeProviders.pulumi-foo = {
@@ -160,7 +164,7 @@ pulumi.terraformBridgeProviders.pulumi-foo = {
 
 Pick one per language, not both: a generated SDK has no committed counterpart for `sdkDrift` to diff.
 Languages left alone keep building from the repo, so a provider can generate some and commit others.
-This runs the same [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) that [`mkGeneratedSdk`](usage.md#mkgeneratedsdk) uses, against the schema `checks.<name>-schema` already builds, so each language needs its own `languagePlugin` for the same reason the drift check does.
+This runs [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) through [`mkSdkSource`](usage.md#mksdksource), against the schema `checks.<name>-schema` already builds, so each language needs its own `languagePlugin` for the same reason the drift check does.
 
 **Limitation: language overlays are not applied.**
 tfgen's per-language overlays (`info.JavaScript.Overlay` and friends, the hand-written files a `resources.go` splices into its SDKs) are not part of the [package schema](https://www.pulumi.com/docs/iac/guides/building-extending/packages/schema/), so a provider shipping overlays gets an SDK that silently lacks them.
@@ -170,8 +174,31 @@ That provider should keep its committed tree and guard it with `sdkDrift` instea
 `gen-sdk` emits language sources and nothing else, so module files stay required exactly as for a committed tree:
 
 - `nodejs` / `yarnNodejs`: `lockFile` + `npmDepsHash`, or `yarnLockFile` + `yarnDepsHash`.
-- `go`: `vendorHash`, plus `importBasePath`, `goMod` and `goSum` - see [`mkGeneratedGoSdk`](usage.md#mkgeneratedgosdk).
+- `go`: `vendorHash`, plus `importBasePath`, `goMod` and `goSum` - see [`mkSdkSource`](usage.md#mksdksource).
 - `dotnet`: `nugetDeps`.
+- `python`: nothing. `generate` and `languagePlugin` are all `sdks.python` takes.
 
 `narrowSrc` / `srcPaths` do not apply to a generated language: its source is codegen output, already scoped to one language.
-Python is generated in place by `mkTerraformBridgeProvider` rather than through `withGeneratedSdks`, which has no python builder ([Known Gaps](../TODO.md)); it needs no module files, so `generate` and `languagePlugin` are all `sdks.python` takes.
+
+## Python SDKs
+
+Python is an ordinary language here, opt-in like every other: `sdks.python = { }` builds the repo's committed `sdk/python`, and adding `generate = true` plus a `languagePlugin` codegens it instead.
+The same block works on a component provider, which had no python SDK at all before.
+
+One argument is python-specific.
+`distName` is the name the SDK distributes under, which follows the plugin rather than the repo: `cmdRes = "pulumi-resource-random"` gives `pulumi-random`, whatever the repo is called.
+It drives `pythonImportsCheck` (dashes to underscores) and the version check the build runs against `pip show`.
+The provider recipes default it from `cmdRes`, so a bridged or native provider needs it only for an SDK that does not follow the convention.
+
+A component provider always has to say.
+Its generated SDK distributes under the *schema's* package name, which `pulumi package get-schema` reads out of `package.json` rather than from `pname`, so nothing here can derive it at eval time:
+
+```nix
+sdks.python = {
+  languagePlugin = pkgs.pulumiPackages.pulumi-python;
+  distName = "pulumi_test_component_schema";
+};
+```
+
+Read the right value off the schema (`nix build .#your-package-schema` then `jq -r .name`), prefixed with `pulumi_` and with `-` replaced by `_`.
+Getting it wrong fails the build with `Package(s) not found: <name>` followed by `ERROR: Version substitution seems to be broken`.
