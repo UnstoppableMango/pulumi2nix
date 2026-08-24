@@ -160,7 +160,7 @@ pulumi.terraformBridgeProviders.pulumi-foo = {
 
 Pick one per language, not both: a generated SDK has no committed counterpart for `sdkDrift` to diff.
 Languages left alone keep building from the repo, so a provider can generate some and commit others.
-This runs the same [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) that [`mkGeneratedSdk`](../README.md#mkgeneratedsdk) uses, against the schema `checks.<name>-schema` already builds, so each language needs its own `languagePlugin` for the same reason the drift check does.
+This runs the same [`pulumi package gen-sdk`](https://www.pulumi.com/docs/iac/cli/commands/pulumi_package_gen-sdk/) that [`mkGeneratedSdk`](usage.md#mkgeneratedsdk) uses, against the schema `checks.<name>-schema` already builds, so each language needs its own `languagePlugin` for the same reason the drift check does.
 
 **Limitation: language overlays are not applied.**
 tfgen's per-language overlays (`info.JavaScript.Overlay` and friends, the hand-written files a `resources.go` splices into its SDKs) are not part of the [package schema](https://www.pulumi.com/docs/iac/guides/building-extending/packages/schema/), so a provider shipping overlays gets an SDK that silently lacks them.
@@ -170,7 +170,7 @@ That provider should keep its committed tree and guard it with `sdkDrift` instea
 `gen-sdk` emits language sources and nothing else, so module files stay required exactly as for a committed tree:
 
 - `nodejs` / `yarnNodejs`: `lockFile` + `npmDepsHash`, or `yarnLockFile` + `yarnDepsHash`.
-- `go`: `vendorHash`, plus `importBasePath`, `goMod` and `goSum` - see [`mkGeneratedGoSdk`](../README.md#mkgeneratedgosdk).
+- `go`: `vendorHash`, plus `importBasePath`, `goMod` and `goSum` - see [`mkGeneratedGoSdk`](usage.md#mkgeneratedgosdk).
 - `dotnet`: `nugetDeps`.
 
 `narrowSrc` / `srcPaths` do not apply to a generated language: its source is codegen output, already scoped to one language.
