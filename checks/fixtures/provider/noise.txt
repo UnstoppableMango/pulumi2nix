@@ -1,0 +1,2 @@
+Stands in for every file no SDK reads: CI config, Makefile, docs.
+Narrowing exists to keep this out, so its absence is what the check asserts.
