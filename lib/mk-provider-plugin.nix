@@ -88,4 +88,13 @@ buildGoModule (
   }
   // removeAttrs args controlArgs
   // lib.optionalAttrs (postConfigure != "") { inherit postConfigure; }
+  // {
+    # The plugin name Pulumi resolves by - `pulumi-resource-<name>` - is
+    # recoverable from the binary, the same way `mkGenTool` records `cmdGen`.
+    # `pluginRef` reads it to key the plugin cache.
+    meta = {
+      mainProgram = cmdRes;
+    }
+    // (args.meta or { });
+  }
 )

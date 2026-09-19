@@ -42,9 +42,15 @@ buildGoModule (
       version
       vendorHash
       env
-      meta
       src
       ;
+
+    # `postInstall` renames the binary, so the plugin name Pulumi resolves by
+    # isn't recoverable from `pname` or `subPackages`. `pluginRef` reads this.
+    meta = {
+      mainProgram = "pulumi-resource-terraform-provider";
+    }
+    // meta;
 
     subPackages = [ "dynamic" ];
 

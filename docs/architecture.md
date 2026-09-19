@@ -160,6 +160,15 @@ flowchart LR
 
 Several small helpers are shared by nearly every builder and are left out above to keep the graph readable: `fetchProviderSource` (the default `owner`/`repo`/`rev`/`hash` fetch), `srcName` (resolving `sourceRoot` from any `src`), `narrowSdkSrc` ([narrowed SDK sources](sdks.md#narrowed-sdk-sources), used by `mkSdkSource`'s committed route), and `langArgNames` (picking `<lang>Args` out of the caller's arguments).
 
+## Package sets
+
+[`mkPackageSet`](package-sets.md) is deliberately absent from both tables above.
+It produces no Pulumi artifact.
+It is a scope over the artifacts the builders produce, fixing the inputs they share so a group of them can be named, versioned, and pinned as a group.
+
+`mkPulumiEnv` is the one node it adds, and that node is Pulumi's, not this library's: `$PULUMI_HOME/plugins` already appears in the artifact graph above as the plugin cache, reached by every plugin builder.
+`mkPulumiEnv` is the derivation that assembles it.
+
 ## Deviations from Pulumi's graph
 
 The builder graph should be the artifact graph, one derivation per node.

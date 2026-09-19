@@ -42,5 +42,18 @@ stdenv.mkDerivation (
     "schema"
     "pname"
   ]
-  // lib.optionalAttrs (schema != null) { passthru.schema = schema; }
+  // {
+    passthru =
+      (args.passthru or { })
+      // {
+        # There is no `pulumi-resource-<name>` binary to read a plugin name off,
+        # and the tree is the plugin, so `$out` itself is what the cache entry
+        # holds. `pluginRef` reads this.
+        pulumiPlugin = {
+          name = pname;
+          subdir = ".";
+        };
+      }
+      // lib.optionalAttrs (schema != null) { inherit schema; };
+  }
 )
