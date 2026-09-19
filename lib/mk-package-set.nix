@@ -25,6 +25,12 @@
   writeText,
   mkPulumiEnv,
   pluginRef,
+
+  # The builders as uninstantiated paths, `<name> -> path`. They are
+  # `callPackage`d inside the set's own scope so that a builder's *own* inputs
+  # resolve through the pins too: a member calling `mkTerraformBridgeProvider`
+  # gets one whose nested `mkSdkSource` sees `pins.pulumi`, not the outer
+  # `pkgs.pulumi`.
   builders,
 }:
 let
@@ -52,7 +58,10 @@ let
     }@args:
     let
       scope = lib.makeScope newScope (
-        self: builders // pins // lib.mapAttrs (_: value: self.callPackage value { }) packages
+        self:
+        lib.mapAttrs (_: path: self.callPackage path { }) builders
+        // pins
+        // lib.mapAttrs (_: value: self.callPackage value { }) packages
       );
 
       final = scope.overrideScope overrides;

@@ -25,6 +25,23 @@ let
         chmod +x $out/bin/pulumi-resource-${name}
       '';
 
+  # A stand-in for the `pulumi` CLI that is distinguishable from `pkgs.pulumi`,
+  # so a pin can be told apart from the outer `pkgs` by store path alone.
+  probePulumi = pkgs.writeShellScriptBin "pulumi" "exit 0";
+
+  # An SDK source built through a *builder* reached from the scope rather than
+  # through a member. `mkSdkSource`'s own `pulumi` input is the one a member
+  # never names, so it is where an outer-`pkgs` leak would show up.
+  probeSdkSource =
+    set:
+    set.scope.mkSdkSource {
+      lang = "nodejs";
+      pname = "probe";
+      version = "0.0.0";
+      languagePlugin = pkgs.hello;
+      schema = pkgs.runCommandLocal "probe-schema" { } "mkdir -p $out && echo '{}' > $out/schema.json";
+    };
+
   base = mkPackageSet {
     name = "fixture";
     version = "1.0.0";
@@ -51,6 +68,9 @@ let
     };
   };
 
+  # The same set with the CLI pin moved off `pkgs.pulumi`.
+  repinned = base.extend { pins.pulumi = probePulumi; };
+
   cases = {
     # The caching claim: membership and the set's own version are not inputs to
     # a member, so an unrelated override leaves its store path alone.
@@ -67,6 +87,13 @@ let
     "members are built against the set's pins" = {
       actual = base.scope.pulumi.drvPath;
       expected = pkgs.pulumi.drvPath;
+    };
+
+    # A builder is instantiated in the scope, not bound against the outer
+    # `pkgs` and handed over. Otherwise its own inputs ignore the pins.
+    "a builder's own inputs resolve through the set's pins" = {
+      actual = (probeSdkSource repinned).drvPath != (probeSdkSource base).drvPath;
+      expected = true;
     };
 
     "the manifest records member versions" = {
