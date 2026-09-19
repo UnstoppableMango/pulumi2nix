@@ -84,6 +84,14 @@ let
     # builds from, so an unrelated file change stops rebuilding every SDK.
     narrowSdkSrc = callPackage ./narrow-sdk-src.nix { };
 
+    # Normalizes a plugin package to the `{ name, version, plugin, dir }` shape
+    # Pulumi's plugin cache is keyed by.
+    pluginRef = callPackage ./plugin-ref.nix { };
+
+    # The shell snippet that copies a list of plugins into a writable
+    # `$PULUMI_HOME/plugins`, so a build can resolve them offline.
+    seedPlugins = callPackage ./seed-plugins.nix { };
+
     # nixpkgs has no `pulumi-language-dotnet` builder, so this is a pinned build
     # for use as a `pulumi package gen-sdk --language dotnet` plugin.
     pulumiLanguageDotnet = callPackage ./pulumi-language-dotnet.nix { };
