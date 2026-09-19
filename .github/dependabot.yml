@@ -1,0 +1,15 @@
+# Renovate handles dependency updates for this repo (see renovate.json).
+# This file exists solely to keep Dependabot away from checked-in generated
+# Go SDKs, where its updates rewrite go.mod without regenerating the SDK and
+# break the Nix checks.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - "/examples/*/generated-sdk/go"
+      - "/checks/fixtures/provider/sdk"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
