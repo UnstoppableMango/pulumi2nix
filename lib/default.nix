@@ -50,6 +50,17 @@ let
     # The dynamic bridge has no schema and no SDKs, so its recipe is its builder.
     mkDynamicBridgeProvider = self.mkDynamicPlugin;
 
+    ## Package sets. A versioned group of the above, built against shared pins.
+
+    # A named, versioned scope of packages. What a channel is: `.extend` derives
+    # one set from another, and unchanged members keep their store paths.
+    mkPackageSet = callPackage ./mk-package-set.nix { builders = self; };
+
+    # A plugin cache tree, and optionally a pinned CLI, over a selection of a
+    # set's plugins. The only derivation that varies per selection, and it is
+    # symlinks.
+    mkPulumiEnv = callPackage ./mk-pulumi-env.nix { };
+
     ## Utilities.
 
     # Schema-command presets over mkSchema, for the two gen tool conventions.

@@ -12,6 +12,7 @@ For what a provider *is* and how one is written, see Pulumi's [Build a Provider]
 
 - [docs/usage.md](docs/usage.md) - every builder, its full argument shape, and the three entry points.
 - [docs/sdks.md](docs/sdks.md) - `src` overrides, narrowed SDK sources, consuming a nodejs SDK, drift checks, generated SDKs.
+- [docs/package-sets.md](docs/package-sets.md) - versioned groups of packages, channels, and what they buy in cache hits.
 - [docs/architecture.md](docs/architecture.md) - the artifact graph, the builder graph, and where the two disagree.
 - [`examples/`](examples) - a buildable flake per builder.
 
@@ -36,6 +37,8 @@ And recipes that compose them:
 | [`mkTerraformBridgeProvider`](docs/usage.md#mkterraformbridgeprovider) | the same, bridged from Terraform ahead of time |
 | [`mkComponentPackage`](docs/usage.md#mkcomponentpackage) | component provider: schema, plugin tree, generated SDKs |
 | [`mkDynamicBridgeProvider`](docs/usage.md#mkdynamicbridgeprovider) | the dynamic bridge, which has no schema and no SDKs |
+
+And [`mkPackageSet`](docs/package-sets.md) groups any of them into a versioned set built against shared pins, which is what a channel is, with [`mkPulumiEnv`](docs/package-sets.md#environments) assembling a selection into a plugin cache.
 
 Plus `mkPulumiSchema` / `mkTerraformBridgeSchema` (schema-command presets), [`withSdks`](docs/usage.md#withsdks), [`mkSdkDriftCheck`](docs/usage.md#mksdkdriftcheck), and [`pulumiLanguageDotnet`](docs/usage.md#pulumilanguagedotnet), a pinned [`pulumi-language-dotnet`](https://github.com/pulumi/pulumi-dotnet) host.
 

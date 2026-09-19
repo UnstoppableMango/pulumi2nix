@@ -8,3 +8,4 @@ Provide builders for generating providers from non-Terraform schema sources, suc
 Provide builders for building component provider packages, which expose typed multi-language components as a provider plugin.
 Provide builders for generating a provider's schema (`schema.json`) independent of its plugin binary.
 Provide composable builders for generating language SDKs (Node.js, Python, Go, .NET, Java) from a provider's schema.
+Provide a builder for a package set: a named, versioned group of the above built against shared pinned inputs, which downstreams publish as channels, and which keeps a consumer's choice of plugins out of any plugin's hash.

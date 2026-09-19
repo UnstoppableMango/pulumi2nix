@@ -69,6 +69,11 @@
               p2n = config.pulumi.lib;
             };
 
+            package-set = import ./checks/package-set.nix {
+              inherit lib pkgs;
+              inherit (config.pulumi.lib) mkPackageSet;
+            };
+
             sdk-drift = import ./checks/sdk-drift.nix {
               inherit pkgs;
               inherit (config.pulumi.lib) mkSdkDriftCheck;
