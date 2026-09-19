@@ -20,6 +20,11 @@
   name ? "pulumi-env",
   plugins ? [ ],
   pulumi ? null,
+
+  # Where `seedScript` copies the cache to. Pulumi's own resolution order, so a
+  # sandboxed build that points `PULUMI_HOME` at a writable directory is seeded
+  # where it will actually look.
+  pulumiHome ? "\${PULUMI_HOME:-$HOME/.pulumi}",
   ...
 }@args:
 let
@@ -45,13 +50,14 @@ runCommandLocal name
       passthru = {
         inherit plugins;
         pluginRefs = refs;
-        seedScript = seedPlugins { inherit plugins; };
+        seedScript = seedPlugins { inherit plugins pulumiHome; };
       };
     }
     // removeAttrs args [
       "name"
       "plugins"
       "pulumi"
+      "pulumiHome"
     ]
   )
   # `ln -s` onto an existing name fails, and the build runs under `set -e`, so

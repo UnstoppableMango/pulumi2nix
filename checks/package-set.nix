@@ -132,6 +132,19 @@ pkgs.runCommandLocal "package-set" { } ''
     exit 1
   fi
 
+  # The seed script has to land in the cache Pulumi will read, which is
+  # `$PULUMI_HOME` when one is set, not `$HOME/.pulumi` unconditionally.
+  export HOME="$PWD/home"
+  export PULUMI_HOME="$PWD/pulumi-home"
+  mkdir -p "$HOME" "$PULUMI_HOME"
+  ${env.passthru.seedScript}
+  test -x "$PULUMI_HOME/plugins/resource-alpha-v1.2.3/pulumi-resource-alpha"
+
+  if [ -e "$HOME/.pulumi" ]; then
+    echo "package-set: seedScript ignored PULUMI_HOME" >&2
+    exit 1
+  fi
+
   ${pkgs.jq}/bin/jq -e '.schemaVersion == 1 and .set.name == "fixture"' ${base.manifest} > /dev/null
 
   touch $out

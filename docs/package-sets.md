@@ -110,7 +110,8 @@ env = set.env { plugins = [ set.members.random ]; };
 - `$out/plugins/resource-<name>-v<version>/` is Pulumi's plugin cache layout, and the general form.
   A component provider is a source tree with no binary, so this is the only route that covers one.
 - `$out/bin/` holds the plugin binaries plus the set's pinned CLI, for Pulumi's ambient plugin resolution off `PATH`.
-- `passthru.seedScript` copies `$out/plugins` into `$PULUMI_HOME/plugins`.
+- `passthru.seedScript` copies `$out/plugins` into `$PULUMI_HOME/plugins`, falling back to `$HOME/.pulumi/plugins` when `PULUMI_HOME` is unset.
+  `env`'s `pulumiHome` argument overrides that target.
 
 The seed script is the route a sandboxed build has to take.
 Pulumi writes to `$PULUMI_HOME` as it runs, so `$PULUMI_HOME` cannot be a store path, and the cache has to be copied into a writable directory first.
