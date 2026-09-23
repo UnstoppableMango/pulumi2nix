@@ -20,9 +20,10 @@
     inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = import inputs.systems;
-      imports = [
-        inputs.systems.flakeModule
-        inputs.treefmt-nix.flakeModule
+
+      imports = with inputs; [
+        systems.flakeModule
+        treefmt-nix.flakeModule
         ./modules/flake-module.nix
       ];
 
@@ -34,9 +35,9 @@
 
       perSystem =
         {
-          config,
-          lib,
           pkgs,
+          lib,
+          config,
           ...
         }:
         let
@@ -149,7 +150,10 @@
           };
 
           treefmt.programs = {
+            deadnix.enable = true;
             nixfmt.enable = true;
+            statix.enable = true;
+            zizmor.enable = true;
           };
         };
     };
