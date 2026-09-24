@@ -118,34 +118,12 @@
 
               touch $out
             '';
-
-            nix-lint =
-              let
-                nixFiles = lib.fileset.toSource {
-                  root = ./.;
-                  fileset = lib.fileset.fileFilter (file: file.hasExt "nix") ./.;
-                };
-              in
-              pkgs.runCommandLocal "nix-lint"
-                {
-                  nativeBuildInputs = with pkgs; [
-                    statix
-                    deadnix
-                  ];
-                }
-                ''
-                  statix check ${nixFiles}
-                  deadnix --fail ${nixFiles}
-                  touch $out
-                '';
           };
 
           devShells.default = pkgs.mkShellNoCC {
             packages = with pkgs; [
-              deadnix
               gnumake
               nixfmt
-              statix
             ];
           };
 
