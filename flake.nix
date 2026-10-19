@@ -20,9 +20,10 @@
     inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = import inputs.systems;
-      imports = [
-        inputs.systems.flakeModule
-        inputs.treefmt-nix.flakeModule
+
+      imports = with inputs; [
+        systems.flakeModule
+        treefmt-nix.flakeModule
         ./modules/flake-module.nix
       ];
 
@@ -34,9 +35,9 @@
 
       perSystem =
         {
-          config,
-          lib,
           pkgs,
+          lib,
+          config,
           ...
         }:
         let
@@ -117,39 +118,20 @@
 
               touch $out
             '';
-
-            nix-lint =
-              let
-                nixFiles = lib.fileset.toSource {
-                  root = ./.;
-                  fileset = lib.fileset.fileFilter (file: file.hasExt "nix") ./.;
-                };
-              in
-              pkgs.runCommandLocal "nix-lint"
-                {
-                  nativeBuildInputs = with pkgs; [
-                    statix
-                    deadnix
-                  ];
-                }
-                ''
-                  statix check ${nixFiles}
-                  deadnix --fail ${nixFiles}
-                  touch $out
-                '';
           };
 
           devShells.default = pkgs.mkShellNoCC {
             packages = with pkgs; [
-              deadnix
               gnumake
               nixfmt
-              statix
             ];
           };
 
           treefmt.programs = {
+            deadnix.enable = true;
             nixfmt.enable = true;
+            statix.enable = true;
+            zizmor.enable = true;
           };
         };
     };
