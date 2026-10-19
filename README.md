@@ -4,6 +4,7 @@
 [![Built with Nix](https://img.shields.io/badge/built%20with-nix-5277C3?logo=nixos&logoColor=white)](https://builtwithnix.org)
 [![License: MIT](https://img.shields.io/github/license/UnstoppableMango/pulumi2nix)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/UnstoppableMango/pulumi2nix)](https://github.com/UnstoppableMango/pulumi2nix/commits/main)
+[![Hercules CI](https://hercules-ci.com/api/v1/site/github/account/UnstoppableMango/project/pulumi2nix/badge)](https://hercules-ci.com/github/UnstoppableMango/pulumi2nix)
 
 Composable Nix builders for Pulumi providers, packages, and language SDKs.
 
