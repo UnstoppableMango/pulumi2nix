@@ -97,6 +97,33 @@ sdks.nodejs = {
 npm drops the named packages before pruning, so anything reachable only through them goes too.
 Yarn classic has no real `prune`, so `sdks.yarnNodejs` deletes them afterwards and their orphaned transitive dependencies stay behind; nothing resolves to those, but the output carries them.
 
+### As an npm tarball
+
+A consumer that can only run `npm install` or `bun install`, with no step to copy from the store, needs a tarball instead.
+Every nodejs SDK has a second output, `tarball`, holding `npm pack` of the same package:
+
+```sh
+nix build .#pulumi-git-sdk-nodejs.tarball
+ls result-tarball/   # unmango-pulumi-git-0.0.2.tgz
+```
+
+Attach that file to a release and depend on it by URL:
+
+```json
+"@unmango/pulumi-git": "https://github.com/<owner>/<repo>/releases/download/v<version>/unmango-pulumi-git-<version>.tgz"
+```
+
+`omitDeps` does not apply to the tarball.
+Its `package.json` still lists `@pulumi/pulumi`, so the consumer's package manager installs the one shared copy, and it carries no `node_modules`.
+The file name and `version` follow the SDK derivation's `version`.
+
+The tarball packs the same tree the store output holds.
+For `sdks.nodejs` that is the compiled `bin/` with `package.json`, `README.md` and `LICENSE`, the layout Pulumi publishes its own SDKs in.
+For `sdks.yarnNodejs` it is `sdk/nodejs` as installed, so its own `package.json` (`main`, `types`, `files`) decides what the package exposes, as it already does for the store output.
+
+`npm pack` fixes every mtime, and the `sdks.nodejs` tarball rebuilds byte-for-byte identical, so a checksum taken from a nix build should match one taken in CI.
+Before publishing checksums, confirm it for your SDK and toolchain with `nix build .#<name>-sdk-nodejs.tarball --rebuild`, which fails if the rebuild differs.
+
 ## SDK drift checks
 
 `mkTerraformBridgeProvider` reads committed SDKs straight out of `sdk/<lang>`, so a resource change landing without a regenerated SDK still builds and `nix flake check` stays green against a stale tree.

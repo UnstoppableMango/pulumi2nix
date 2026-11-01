@@ -5,6 +5,7 @@
   yarnConfigHook,
   yarnBuildHook,
   yarnInstallHook,
+  nodejs,
   srcName,
 }:
 {
@@ -28,10 +29,19 @@ stdenv.mkDerivation (
 
     sourceRoot = "${srcName src}/sdk/nodejs";
 
+    # As in npm.nix: `npm pack` of the installed package, as installed. The
+    # `omitDeps` cleanup below only deletes `node_modules` entries, which `npm
+    # pack` leaves out anyway, and the package.json keeps `@pulumi/pulumi`.
+    outputs = [
+      "out"
+      "tarball"
+    ];
+
     nativeBuildInputs = [
       yarnConfigHook
       yarnBuildHook
       yarnInstallHook
+      nodejs
     ];
 
     yarnOfflineCache = fetchYarnDeps {
@@ -46,7 +56,19 @@ stdenv.mkDerivation (
         package.json
     '';
 
-    postInstall = lib.optionalString (omitDeps != [ ]) ''
+    postInstall = ''
+      pkgName=$(node -p "require('./package.json').name")
+
+      # The repo-root README and LICENSE, as npm.nix copies them into `bin/`,
+      # unless the SDK ships its own.
+      cp -n ../../README.md ../../LICENSE "$out/lib/node_modules/$pkgName/" 2>/dev/null || true
+
+      mkdir -p "$tarball"
+      # npm's default cache lives under HOME, which the sandbox leaves unwritable.
+      npm_config_cache="$TMPDIR/npm-cache" npm pack "$out/lib/node_modules/$pkgName" \
+        --ignore-scripts --pack-destination "$tarball"
+    ''
+    + lib.optionalString (omitDeps != [ ]) ''
       shopt -s nullglob
       for nodeModules in "$out"/lib/node_modules/*/node_modules "$out"/lib/node_modules/@*/*/node_modules; do
         for dep in ${lib.escapeShellArgs omitDeps}; do

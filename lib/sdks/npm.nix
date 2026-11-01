@@ -23,6 +23,17 @@ buildNpmPackage (
 
     sourceRoot = "${srcName src}/sdk/nodejs";
 
+    # `tarball` holds `npm pack` of the same package, for consumers that can only
+    # `npm install`/`bun install` a URL or path. It packs `bin/`, whose
+    # package.json is upstream's: the `omitDeps` edit below rewrites only the
+    # build's own `./package.json`, to steer `npm prune`. So the tarball still
+    # lists `@pulumi/pulumi`, and the consumer's package manager provides the one
+    # shared copy.
+    outputs = [
+      "out"
+      "tarball"
+    ];
+
     postPatch = ''
       cp ${lockFile} package-lock.json
       sed -i \
@@ -44,6 +55,12 @@ buildNpmPackage (
       packageOut="$out/lib/node_modules/$pkgName"
       mkdir -p "$packageOut"
       cp -r bin/. "$packageOut/"
+
+      mkdir -p "$tarball"
+      # npm_config_cache points at the read-only deps store, and pack writes to
+      # its cache even for a local directory.
+      npm_config_cache="$TMPDIR/npm-cache" npm pack ./bin \
+        --ignore-scripts --pack-destination "$tarball"
 
       ${lib.optionalString (omitDeps != [ ]) ''
         node -e '

@@ -106,6 +106,16 @@
               touch $out
             '';
 
+            sdk-tarball =
+              let
+                sdk = config.packages.pulumi-command-sdk-nodejs;
+              in
+              import ./checks/sdk-tarball.nix {
+                inherit pkgs sdk;
+                # npm's name for `@pulumi/command`'s pack: scope and name, dashed.
+                fileName = "pulumi-command-${sdk.version}.tgz";
+              };
+
             dynamic-bridge-version = pkgs.runCommandLocal "dynamic-bridge-version" { } ''
               want=v1.1.3
               got=$(${lib.getExe config.packages.pulumi-terraform-provider} --version)
