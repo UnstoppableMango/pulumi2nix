@@ -5,6 +5,7 @@
   yarnConfigHook,
   yarnBuildHook,
   yarnInstallHook,
+  nodejs,
   srcName,
 }:
 {
@@ -28,10 +29,18 @@ stdenv.mkDerivation (
 
     sourceRoot = "${srcName src}/sdk/nodejs";
 
+    # As in npm.nix: `npm pack` of the installed package, whose package.json is
+    # left alone by the `omitDeps` cleanup below.
+    outputs = [
+      "out"
+      "tarball"
+    ];
+
     nativeBuildInputs = [
       yarnConfigHook
       yarnBuildHook
       yarnInstallHook
+      nodejs
     ];
 
     yarnOfflineCache = fetchYarnDeps {
@@ -46,7 +55,13 @@ stdenv.mkDerivation (
         package.json
     '';
 
-    postInstall = lib.optionalString (omitDeps != [ ]) ''
+    postInstall = ''
+      pkgName=$(node -p "require('./package.json').name")
+      mkdir -p "$tarball"
+      npm_config_cache="$TMPDIR/npm-cache" npm pack "$out/lib/node_modules/$pkgName" \
+        --ignore-scripts --pack-destination "$tarball"
+    ''
+    + lib.optionalString (omitDeps != [ ]) ''
       shopt -s nullglob
       for nodeModules in "$out"/lib/node_modules/*/node_modules "$out"/lib/node_modules/@*/*/node_modules; do
         for dep in ${lib.escapeShellArgs omitDeps}; do

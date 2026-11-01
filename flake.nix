@@ -106,6 +106,37 @@
               touch $out
             '';
 
+            # The `tarball` output is what a consumer that can only `npm install`
+            # or `bun install` depends on, so it has to carry @pulumi/pulumi as a
+            # dependency even though the store output leaves its copy out.
+            sdk-tarball =
+              let
+                sdk = config.packages.pulumi-command-sdk-nodejs;
+              in
+              pkgs.runCommandLocal "sdk-tarball" { nativeBuildInputs = [ pkgs.jq ]; } ''
+                fail() {
+                  echo "sdk-tarball: $*" >&2
+                  exit 1
+                }
+
+                tarballs=(${sdk.tarball}/*.tgz)
+                [ "''${#tarballs[@]}" -eq 1 ] || fail "expected one .tgz, found: ''${tarballs[*]}"
+                [ "$(basename "''${tarballs[0]}")" = pulumi-command-${sdk.version}.tgz ] \
+                  || fail "unexpected file name $(basename "''${tarballs[0]}")"
+
+                tar -xzf "''${tarballs[0]}"
+                test -f package/index.js || fail "package/index.js missing"
+                test -f package/index.d.ts || fail "package/index.d.ts missing"
+                [ ! -e package/node_modules ] || fail "tarball bundles node_modules"
+
+                [ "$(jq -r .version package/package.json)" = ${sdk.version} ] \
+                  || fail "package.json version is not ${sdk.version}"
+                jq -e '.dependencies["@pulumi/pulumi"]' package/package.json >/dev/null \
+                  || fail "package.json lost its @pulumi/pulumi dependency"
+
+                touch $out
+              '';
+
             dynamic-bridge-version = pkgs.runCommandLocal "dynamic-bridge-version" { } ''
               want=v1.1.3
               got=$(${lib.getExe config.packages.pulumi-terraform-provider} --version)

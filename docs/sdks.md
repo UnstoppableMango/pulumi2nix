@@ -97,6 +97,26 @@ sdks.nodejs = {
 npm drops the named packages before pruning, so anything reachable only through them goes too.
 Yarn classic has no real `prune`, so `sdks.yarnNodejs` deletes them afterwards and their orphaned transitive dependencies stay behind; nothing resolves to those, but the output carries them.
 
+### As an npm tarball
+
+A consumer that can only run `npm install` or `bun install`, with no step to copy from the store, needs a tarball instead.
+Every nodejs SDK has a second output, `tarball`, holding `npm pack` of the same package:
+
+```sh
+nix build .#pulumi-git-sdk-nodejs.tarball
+ls result-tarball/   # unmango-pulumi-git-0.0.2.tgz
+```
+
+Attach that file to a release and depend on it by URL:
+
+```json
+"@unmango/pulumi-git": "https://github.com/<owner>/<repo>/releases/download/v<version>/unmango-pulumi-git-<version>.tgz"
+```
+
+`omitDeps` does not apply to the tarball.
+Its `package.json` still lists `@pulumi/pulumi`, so the consumer's package manager installs the one shared copy, and it carries no `node_modules`.
+The file name and `version` follow the SDK derivation's `version`, and the archive is byte-for-byte reproducible, so a checksum computed from a nix build matches one computed in CI.
+
 ## SDK drift checks
 
 `mkTerraformBridgeProvider` reads committed SDKs straight out of `sdk/<lang>`, so a resource change landing without a regenerated SDK still builds and `nix flake check` stays green against a stale tree.
