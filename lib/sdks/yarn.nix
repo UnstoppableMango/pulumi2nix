@@ -58,6 +58,11 @@ stdenv.mkDerivation (
 
     postInstall = ''
       pkgName=$(node -p "require('./package.json').name")
+
+      # The repo-root README and LICENSE, as npm.nix copies them into `bin/`,
+      # unless the SDK ships its own.
+      cp -n ../../README.md ../../LICENSE "$out/lib/node_modules/$pkgName/" 2>/dev/null || true
+
       mkdir -p "$tarball"
       # npm's default cache lives under HOME, which the sandbox leaves unwritable.
       npm_config_cache="$TMPDIR/npm-cache" npm pack "$out/lib/node_modules/$pkgName" \
