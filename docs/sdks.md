@@ -115,7 +115,14 @@ Attach that file to a release and depend on it by URL:
 
 `omitDeps` does not apply to the tarball.
 Its `package.json` still lists `@pulumi/pulumi`, so the consumer's package manager installs the one shared copy, and it carries no `node_modules`.
-The file name and `version` follow the SDK derivation's `version`, and the archive is byte-for-byte reproducible, so a checksum computed from a nix build matches one computed in CI.
+The file name and `version` follow the SDK derivation's `version`.
+
+The tarball packs the same tree the store output holds.
+For `sdks.nodejs` that is the compiled `bin/` with `package.json`, `README.md` and `LICENSE`, the layout Pulumi publishes its own SDKs in.
+For `sdks.yarnNodejs` it is `sdk/nodejs` as installed, so its own `package.json` (`main`, `types`, `files`) decides what the package exposes, as it already does for the store output.
+
+`npm pack` fixes every mtime, and the `sdks.nodejs` tarball rebuilds byte-for-byte identical, so a checksum taken from a nix build should match one taken in CI.
+Before publishing checksums, confirm it for your SDK and toolchain with `nix build .#<name>-sdk-nodejs.tarball --rebuild`, which fails if the rebuild differs.
 
 ## SDK drift checks
 

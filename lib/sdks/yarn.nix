@@ -29,8 +29,9 @@ stdenv.mkDerivation (
 
     sourceRoot = "${srcName src}/sdk/nodejs";
 
-    # As in npm.nix: `npm pack` of the installed package, whose package.json is
-    # left alone by the `omitDeps` cleanup below.
+    # As in npm.nix: `npm pack` of the installed package, as installed. The
+    # `omitDeps` cleanup below only deletes `node_modules` entries, which `npm
+    # pack` leaves out anyway, and the package.json keeps `@pulumi/pulumi`.
     outputs = [
       "out"
       "tarball"
@@ -58,6 +59,7 @@ stdenv.mkDerivation (
     postInstall = ''
       pkgName=$(node -p "require('./package.json').name")
       mkdir -p "$tarball"
+      # npm's default cache lives under HOME, which the sandbox leaves unwritable.
       npm_config_cache="$TMPDIR/npm-cache" npm pack "$out/lib/node_modules/$pkgName" \
         --ignore-scripts --pack-destination "$tarball"
     ''

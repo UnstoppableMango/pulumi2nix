@@ -24,9 +24,11 @@ buildNpmPackage (
     sourceRoot = "${srcName src}/sdk/nodejs";
 
     # `tarball` holds `npm pack` of the same package, for consumers that can only
-    # `npm install`/`bun install` a URL or path. It packs `bin/` before the
-    # `omitDeps` edit below, so its package.json still lists `@pulumi/pulumi` and
-    # the consumer's package manager provides the one shared copy.
+    # `npm install`/`bun install` a URL or path. It packs `bin/`, whose
+    # package.json is upstream's: the `omitDeps` edit below rewrites only the
+    # build's own `./package.json`, to steer `npm prune`. So the tarball still
+    # lists `@pulumi/pulumi`, and the consumer's package manager provides the one
+    # shared copy.
     outputs = [
       "out"
       "tarball"
